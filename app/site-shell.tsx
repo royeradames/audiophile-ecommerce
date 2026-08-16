@@ -102,7 +102,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           </nav>
           <p>
             Audiophile is an all-in-one destination for considered home and
-            personal audio. This private challenge build uses fictional products
+            personal audio. This portfolio challenge build uses fictional products
             and a simulated checkout.
           </p>
           <p className="copyright">© 2026 Audiophile. Demo experience.</p>

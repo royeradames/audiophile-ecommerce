@@ -91,7 +91,7 @@ export default function CheckoutPage() {
         <div className="checkout-layout">
           <form id="checkout-form" className="checkout-form" noValidate onSubmit={submit}>
             <div className="checkout-intro">
-              <p className="overline overline-accent">Private demo</p>
+              <p className="overline overline-accent">Fictional demo</p>
               <h1 id="checkout-title">Checkout</h1>
               <p>Nothing is charged or sent. Use fictional contact and payment details only.</p>
             </div>

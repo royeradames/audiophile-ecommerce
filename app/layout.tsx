@@ -17,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const origin = `${protocol}://${host}`;
   const title = "Audiophile — Sound worth slowing down for";
   const description =
-    "A private, responsive storefront experiment for considered personal and home audio.";
+    "A responsive portfolio storefront experiment for considered personal and home audio.";
 
   return {
     metadataBase: new URL(origin),

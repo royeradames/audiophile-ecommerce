@@ -1,6 +1,6 @@
 # Audiophile
 
-Private, responsive storefront experiment adapted from Frontend Mentor's Audiophile e-commerce challenge.
+Responsive portfolio storefront experiment adapted from Frontend Mentor's Audiophile e-commerce challenge.
 
 ## Product boundary
 
