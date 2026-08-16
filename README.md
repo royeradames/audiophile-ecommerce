@@ -18,6 +18,7 @@ npm install
 npm run dev
 npm test
 npm run lint
+npm run build:vercel
 ```
 
-The project uses Next.js-style App Router source compiled by vinext for Sites. Product imagery and seed copy are challenge assets; see `THIRD_PARTY_ASSETS_LICENSE.md`.
+The project uses Next.js App Router source with two build targets: native Next.js for Vercel and vinext for Sites. Production is published at <https://audiophile.royeradames.com>; the owner-only Sites build remains available as a private fallback. Product imagery and seed copy are challenge assets; see `THIRD_PARTY_ASSETS_LICENSE.md`.
