@@ -2,12 +2,24 @@
 
 /* eslint-disable @next/next/no-img-element */
 
+import { AnyFieldApi, useForm } from "@tanstack/react-form";
 import Link from "next/link";
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { z } from "zod";
 import { formatPrice, getProduct } from "../catalog";
 import { useCart } from "../cart-context";
 
-type FieldErrors = Record<string, string>;
+const fieldOrder = [
+  "name",
+  "email",
+  "phone",
+  "address",
+  "zip",
+  "city",
+  "country",
+  "emoneyNumber",
+  "pin",
+] as const;
 
 const fields = [
   { name: "name", label: "Name", type: "text", autoComplete: "name", placeholder: "Alex Morgan" },
@@ -19,10 +31,98 @@ const fields = [
   { name: "country", label: "Country", type: "text", autoComplete: "country-name", placeholder: "United States" },
 ] as const;
 
+const emoneyNumberField = {
+  name: "emoneyNumber",
+  label: "Demo e-Money number",
+  type: "text",
+  autoComplete: "off",
+  placeholder: "123456789",
+} as const;
+
+const pinField = {
+  name: "pin",
+  label: "Demo PIN",
+  type: "password",
+  autoComplete: "off",
+  placeholder: "1234",
+} as const;
+
+function requiredText(label: string) {
+  return z.string().refine((value) => value.trim().length > 0, {
+    error: `${label} is required.`,
+  });
+}
+
+const checkoutSchema = z
+  .object({
+    name: requiredText("Name"),
+    email: z.string().superRefine((value, ctx) => {
+      if (!value.trim()) {
+        ctx.addIssue({ code: "custom", message: "Email address is required." });
+        return;
+      }
+      if (!/^\S+@\S+\.\S+$/.test(value)) {
+        ctx.addIssue({ code: "custom", message: "Enter a valid email address." });
+      }
+    }),
+    phone: requiredText("Phone number"),
+    address: requiredText("Address"),
+    zip: requiredText("ZIP code"),
+    city: requiredText("City"),
+    country: requiredText("Country"),
+    payment: z.enum(["emoney", "cash"]),
+    emoneyNumber: z.string(),
+    pin: z.string(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.payment !== "emoney") return;
+    if (!/^\d{9}$/.test(value.emoneyNumber)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["emoneyNumber"],
+        message: "Use the nine-digit demo number 123456789.",
+      });
+    }
+    if (!/^\d{4}$/.test(value.pin)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["pin"],
+        message: "Use any four-digit demo PIN.",
+      });
+    }
+  });
+
+type CheckoutValues = z.input<typeof checkoutSchema>;
+
+const defaultValues: CheckoutValues = {
+  name: "",
+  email: "",
+  phone: "",
+  address: "",
+  zip: "",
+  city: "",
+  country: "",
+  payment: "emoney",
+  emoneyNumber: "",
+  pin: "",
+};
+
+function fieldErrorMessage(errors: unknown[]): string | undefined {
+  for (const error of errors) {
+    if (!error) continue;
+    if (typeof error === "string") return error;
+    if (Array.isArray(error)) {
+      const nested = fieldErrorMessage(error);
+      if (nested) return nested;
+    } else if (typeof error === "object" && "message" in error) {
+      const message = (error as { message: unknown }).message;
+      if (typeof message === "string" && message) return message;
+    }
+  }
+}
+
 export default function CheckoutPage() {
   const { items, clearCart } = useCart();
-  const [payment, setPayment] = useState<"emoney" | "cash">("emoney");
-  const [errors, setErrors] = useState<FieldErrors>({});
   const [confirmedTotal, setConfirmedTotal] = useState<number | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -42,34 +142,26 @@ export default function CheckoutPage() {
   const vat = Math.round(subtotal * 0.2);
   const grandTotal = subtotal + shipping + vat;
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const nextErrors: FieldErrors = {};
-    for (const field of fields) {
-      const value = String(data.get(field.name) || "").trim();
-      if (!value) nextErrors[field.name] = `${field.label} is required.`;
-    }
-    const email = String(data.get("email") || "");
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) nextErrors.email = "Enter a valid email address.";
-    if (payment === "emoney") {
-      if (!/^\d{9}$/.test(String(data.get("emoneyNumber") || ""))) {
-        nextErrors.emoneyNumber = "Use the nine-digit demo number 123456789.";
+  const form = useForm({
+    defaultValues,
+    validators: {
+      onSubmit: checkoutSchema,
+    },
+    onSubmit: () => {
+      setConfirmedTotal(grandTotal);
+      clearCart();
+      requestAnimationFrame(() => headingRef.current?.focus());
+    },
+    onSubmitInvalid: ({ formApi }) => {
+      const firstError = fieldOrder.find((name) => {
+        const meta = formApi.getFieldMeta(name);
+        return Boolean(meta?.errors.length);
+      });
+      if (firstError) {
+        requestAnimationFrame(() => document.getElementById(firstError)?.focus());
       }
-      if (!/^\d{4}$/.test(String(data.get("pin") || ""))) {
-        nextErrors.pin = "Use any four-digit demo PIN.";
-      }
-    }
-    setErrors(nextErrors);
-    const firstError = Object.keys(nextErrors)[0];
-    if (firstError) {
-      requestAnimationFrame(() => document.getElementById(firstError)?.focus());
-      return;
-    }
-    setConfirmedTotal(grandTotal);
-    clearCart();
-    requestAnimationFrame(() => headingRef.current?.focus());
-  }
+    },
+  });
 
   if (!detailedItems.length && confirmedTotal === null) {
     return (
@@ -89,7 +181,16 @@ export default function CheckoutPage() {
       <div className="container">
         <Link className="back-link" href="/">← Continue shopping</Link>
         <div className="checkout-layout">
-          <form id="checkout-form" className="checkout-form" noValidate onSubmit={submit}>
+          <form
+            id="checkout-form"
+            className="checkout-form"
+            noValidate
+            onSubmit={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              void form.handleSubmit();
+            }}
+          >
             <div className="checkout-intro">
               <p className="overline overline-accent">Fictional demo</p>
               <h1 id="checkout-title">Checkout</h1>
@@ -100,7 +201,9 @@ export default function CheckoutPage() {
               <legend>Billing details</legend>
               <div className="form-grid">
                 {fields.slice(0, 3).map((field) => (
-                  <FormField key={field.name} field={field} error={errors[field.name]} />
+                  <form.Field key={field.name} name={field.name}>
+                    {(api) => <FormField field={api} spec={field} />}
+                  </form.Field>
                 ))}
               </div>
             </fieldset>
@@ -109,31 +212,57 @@ export default function CheckoutPage() {
               <legend>Shipping info</legend>
               <div className="form-grid">
                 {fields.slice(3).map((field) => (
-                  <FormField key={field.name} field={field} error={errors[field.name]} />
+                  <form.Field key={field.name} name={field.name}>
+                    {(api) => <FormField field={api} spec={field} />}
+                  </form.Field>
                 ))}
               </div>
             </fieldset>
 
             <fieldset>
               <legend>Payment details</legend>
-              <div className="payment-options" role="radiogroup" aria-label="Payment method">
-                <label className={payment === "emoney" ? "selected" : ""}>
-                  <input type="radio" name="payment" value="emoney" checked={payment === "emoney"} onChange={() => setPayment("emoney")} />
-                  Demo e-Money
-                </label>
-                <label className={payment === "cash" ? "selected" : ""}>
-                  <input type="radio" name="payment" value="cash" checked={payment === "cash"} onChange={() => setPayment("cash")} />
-                  Cash on delivery
-                </label>
-              </div>
-              {payment === "emoney" ? (
-                <div className="form-grid payment-fields">
-                  <FormField field={{ name: "emoneyNumber", label: "Demo e-Money number", type: "text", autoComplete: "off", placeholder: "123456789" }} error={errors.emoneyNumber} />
-                  <FormField field={{ name: "pin", label: "Demo PIN", type: "password", autoComplete: "off", placeholder: "1234" }} error={errors.pin} />
-                </div>
-              ) : (
-                <p className="payment-note">You’ll receive a fictional confirmation now. No delivery or payment is created.</p>
-              )}
+              <form.Field name="payment">
+                {(field) => (
+                  <>
+                    <div className="payment-options" role="radiogroup" aria-label="Payment method">
+                      <label className={field.state.value === "emoney" ? "selected" : ""}>
+                        <input
+                          type="radio"
+                          name={field.name}
+                          value="emoney"
+                          checked={field.state.value === "emoney"}
+                          onBlur={field.handleBlur}
+                          onChange={() => field.handleChange("emoney")}
+                        />
+                        Demo e-Money
+                      </label>
+                      <label className={field.state.value === "cash" ? "selected" : ""}>
+                        <input
+                          type="radio"
+                          name={field.name}
+                          value="cash"
+                          checked={field.state.value === "cash"}
+                          onBlur={field.handleBlur}
+                          onChange={() => field.handleChange("cash")}
+                        />
+                        Cash on delivery
+                      </label>
+                    </div>
+                    {field.state.value === "emoney" ? (
+                      <div className="form-grid payment-fields">
+                        <form.Field name={emoneyNumberField.name}>
+                          {(api) => <FormField field={api} spec={emoneyNumberField} />}
+                        </form.Field>
+                        <form.Field name={pinField.name}>
+                          {(api) => <FormField field={api} spec={pinField} />}
+                        </form.Field>
+                      </div>
+                    ) : (
+                      <p className="payment-note">You’ll receive a fictional confirmation now. No delivery or payment is created.</p>
+                    )}
+                  </>
+                )}
+              </form.Field>
             </fieldset>
 
             <button className="button button-primary button-block mobile-order-button" type="submit">
@@ -182,24 +311,29 @@ export default function CheckoutPage() {
 
 function FormField({
   field,
-  error,
+  spec,
 }: {
-  field: { name: string; label: string; type: string; autoComplete: string; placeholder: string; wide?: boolean };
-  error?: string;
+  field: AnyFieldApi;
+  spec: { name: string; label: string; type: string; autoComplete: string; placeholder: string; wide?: boolean };
 }) {
+  const error = fieldErrorMessage(field.state.meta.errors);
+
   return (
-    <label className={`form-field ${field.wide ? "field-wide" : ""}`} htmlFor={field.name}>
-      <span>{field.label}</span>
+    <label className={`form-field ${spec.wide ? "field-wide" : ""}`} htmlFor={spec.name}>
+      <span>{spec.label}</span>
       <input
-        id={field.name}
+        id={spec.name}
         name={field.name}
-        type={field.type}
-        autoComplete={field.autoComplete}
-        placeholder={field.placeholder}
+        type={spec.type}
+        value={field.state.value}
+        autoComplete={spec.autoComplete}
+        placeholder={spec.placeholder}
+        onBlur={field.handleBlur}
+        onChange={(event) => field.handleChange(event.target.value)}
         aria-invalid={Boolean(error)}
-        aria-describedby={error ? `${field.name}-error` : undefined}
+        aria-describedby={error ? `${spec.name}-error` : undefined}
       />
-      {error ? <small id={`${field.name}-error`}>{error}</small> : null}
+      {error ? <small id={`${spec.name}-error`}>{error}</small> : null}
     </label>
   );
 }

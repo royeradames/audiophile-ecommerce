@@ -15,10 +15,12 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@tanstack/react-form": "^1.33.5",
     "drizzle-orm": "0.45.2",
     "next": "^16.3.1",
     "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react-dom": "19.2.6",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
