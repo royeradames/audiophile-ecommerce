@@ -1,0 +1,9 @@
+# Vinext / Wrangler local secrets. Copy to .dev.vars (gitignored) and fill in.
+# Test-mode only. Live sk_live_ / pk_live_ keys are refused by the app.
+
+STRIPE_SECRET_KEY=sk_test_replace_me
+STRIPE_PUBLISHABLE_KEY=pk_test_replace_me
+STRIPE_WEBHOOK_SECRET=whsec_replace_me
+
+# Required to open /orders outside localhost.
+STAFF_PASSWORD=
