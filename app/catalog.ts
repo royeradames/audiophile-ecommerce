@@ -1,5 +1,6 @@
 import productsJson from "./products.json";
 import type { Product } from "./types";
+import { formatUsd } from "./checkout-totals";
 
 export const products = productsJson as Product[];
 
@@ -16,9 +17,5 @@ export function getCategoryProducts(category: string) {
 }
 
 export function formatPrice(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(value);
+  return formatUsd(value);
 }

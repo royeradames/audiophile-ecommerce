@@ -1,0 +1,134 @@
+"use client";
+
+import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
+import { loadStripe, type Stripe } from "@stripe/stripe-js";
+import { useEffect, useMemo, useState } from "react";
+import { createPaymentIntent, fetchStripeConfig } from "./stripe-client";
+import { formatUsd } from "./checkout-totals";
+
+type CardPaymentProps = {
+  orderId: string;
+  amount: number;
+  email: string;
+  onPaid: () => void;
+};
+
+export function CardPayment(props: CardPaymentProps) {
+  const [publishableKey, setPublishableKey] = useState<string | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const config = await fetchStripeConfig();
+      if (cancelled) {
+        return;
+      }
+      if (config.blocked === "live") {
+        setError("Live Stripe keys are blocked. Use sk_test_ / pk_test_ only.");
+        return;
+      }
+      if (!config.configured || !config.publishableKey) {
+        setError("Add STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY (test mode) to .env.local or .dev.vars, then restart the server.");
+        return;
+      }
+      const intent = await createPaymentIntent({
+        orderId: props.orderId,
+        amount: props.amount,
+        email: props.email,
+      });
+      if (cancelled) {
+        return;
+      }
+      if (!intent.ok) {
+        setError(intent.error);
+        return;
+      }
+      setPublishableKey(config.publishableKey);
+      setClientSecret(intent.clientSecret);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [props.amount, props.email, props.orderId]);
+
+  const stripePromise = useMemo(() => {
+    if (!publishableKey) {
+      return null;
+    }
+    return loadStripe(publishableKey) as Promise<Stripe | null>;
+  }, [publishableKey]);
+
+  if (error) {
+    return <p className="stack-hint">{error}</p>;
+  }
+  if (!stripePromise || !clientSecret) {
+    return <p className="stack-hint">Preparing Stripe test card fields…</p>;
+  }
+
+  return (
+    <Elements
+      stripe={stripePromise}
+      options={{
+        clientSecret,
+        appearance: { theme: "stripe" },
+      }}
+    >
+      <CardPaymentForm amount={props.amount} onPaid={props.onPaid} />
+    </Elements>
+  );
+}
+
+function CardPaymentForm({
+  amount,
+  onPaid,
+}: {
+  amount: number;
+  onPaid: () => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <form
+      className="card-payment"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (!stripe || !elements) {
+          return;
+        }
+        setSubmitting(true);
+        setError(null);
+        const result = await stripe.confirmPayment({
+          elements,
+          confirmParams: {
+            return_url: `${window.location.origin}/checkout/stripe`,
+          },
+          redirect: "if_required",
+        });
+        if (result.error) {
+          setError(result.error.message || "The test card was not charged.");
+          setSubmitting(false);
+          return;
+        }
+        const status = result.paymentIntent?.status;
+        if (status === "succeeded") {
+          onPaid();
+          setSubmitting(false);
+          return;
+        }
+        setError("The payment is still pending. Check /orders after Stripe confirms it.");
+        setSubmitting(false);
+      }}
+    >
+      <PaymentElement options={{ layout: "tabs", wallets: { applePay: "auto", googlePay: "auto" } }} />
+      {error ? <p className="stack-hint">{error}</p> : null}
+      <button className="button button-primary button-block" type="submit" disabled={!stripe || submitting}>
+        {submitting ? "Paying…" : `Pay ${formatUsd(amount)} (Stripe test)`}
+      </button>
+    </form>
+  );
+}

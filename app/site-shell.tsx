@@ -99,11 +99,15 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 {item.label}
               </Link>
             ))}
+            <Link href="/payments">Payment stack</Link>
+            <Link href="/zelle">Zelle</Link>
           </nav>
           <p>
             Audiophile is an all-in-one destination for considered home and
-            personal audio. This portfolio challenge build uses fictional products
-            and a simulated checkout.
+            personal audio. This portfolio challenge build uses fictional products.
+            Checkout can use Stripe test cards, DR bank transfer, Zelle, or pay
+            in person. Confirmation is not a live paid order until Stripe test
+            reports payment or a transfer is marked paid.
           </p>
           <p className="copyright">© 2026 Audiophile. Demo experience.</p>
         </div>

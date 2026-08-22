@@ -3,6 +3,8 @@ import { Manrope } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 import { CartProvider } from "./cart-context";
+import { OrderProvider } from "./order-context";
+import { PayeeProvider } from "./payee-context";
 import { SiteShell } from "./site-shell";
 
 const manrope = Manrope({
@@ -58,7 +60,11 @@ export default function RootLayout({
     <html lang="en">
       <body className={manrope.variable}>
         <CartProvider>
-          <SiteShell>{children}</SiteShell>
+          <PayeeProvider>
+            <OrderProvider>
+              <SiteShell>{children}</SiteShell>
+            </OrderProvider>
+          </PayeeProvider>
         </CartProvider>
       </body>
     </html>
