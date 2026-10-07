@@ -14,6 +14,7 @@ const STORAGE_KEY = "audiophile-demo-cart-v1";
 
 type CartContextValue = {
   items: CartLine[];
+  hydrated: boolean;
   itemCount: number;
   isCartOpen: boolean;
   addItem: (productId: string, quantity?: number) => void;
@@ -106,6 +107,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo(
     () => ({
       items,
+      hydrated,
       itemCount: items.reduce((total, line) => total + line.quantity, 0),
       isCartOpen,
       addItem,
@@ -114,7 +116,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       openCart: () => setIsCartOpen(true),
       closeCart: () => setIsCartOpen(false),
     }),
-    [items, isCartOpen, addItem, setQuantity, clearCart],
+    [items, hydrated, isCartOpen, addItem, setQuantity, clearCart],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
