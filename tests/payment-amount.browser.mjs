@@ -24,14 +24,18 @@ try {
   // Substitute only the external payment surfaces. Never submit a card or contact Stripe.
   await context.addInitScript(() => {
     const noop = () => {};
+    window.paymentElementOptions = [];
     window.Stripe = () => ({
       _registerWrapper: noop, registerAppInfo: noop,
       createToken: noop, createPaymentMethod: noop, confirmCardPayment: noop,
       confirmPayment: () => { throw new Error('This UI regression must never submit payment.'); },
-      elements: () => ({ update: noop, getElement: () => null, create: () => ({
-        on: noop, off: noop, update: noop, destroy: noop,
-        mount: (node) => { node.textContent = 'Isolated test payment fields'; },
-      }) }),
+      elements: () => ({ update: noop, getElement: () => null, create: (type, options) => {
+        if (type === 'payment') window.paymentElementOptions.push(options);
+        return {
+          on: noop, off: noop, update: noop, destroy: noop,
+          mount: (node) => { node.textContent = 'Isolated test payment fields'; },
+        };
+      } }),
     });
   });
   await context.route('https://*.stripe.com/**', (route) => route.abort());
@@ -83,7 +87,8 @@ try {
 
   await fillCheckout('element');
   await page.getByRole('button', { name: 'Pay $3,589 (Stripe test)', exact: true }).waitFor();
-  results.push('Initial own-card form sends products and displays the server-returned total.');
+  assert.equal(await page.evaluate(() => window.paymentElementOptions.at(-1)?.defaultValues?.billingDetails?.email), 'synthetic@example.invalid');
+  results.push('Initial own-card form sends products, displays the server-returned total and passes the known email to Stripe.');
   const records = await page.evaluate(() => JSON.parse(localStorage.getItem('audiophile-orders-v1')));
   const cardOrder = records.find((order) => order.payment === 'element');
   assert(cardOrder);
@@ -91,6 +96,7 @@ try {
   await page.evaluate((order) => localStorage.setItem('audiophile-orders-v1', JSON.stringify([order])), forgedCard);
   await page.goto(`${base}/checkout/pay?order=${encodeURIComponent(cardOrder.id)}`);
   await page.getByRole('button', { name: 'Pay $3,589 (Stripe test)', exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => window.paymentElementOptions.at(-1)?.defaultValues?.billingDetails?.email), 'synthetic@example.invalid');
   assert.equal(await page.getByRole('button', { name: 'Pay $1 (Stripe test)', exact: true }).count(), 0);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('audiophile-orders-v1')));
   assert.deepEqual(saved, [forgedCard]);
