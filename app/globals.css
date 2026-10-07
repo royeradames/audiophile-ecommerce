@@ -173,12 +173,12 @@ h3 {
 }
 
 .button-primary {
-  background: var(--accent);
+  background: var(--accent-dark);
   color: #fff;
 }
 
 .button-primary:hover {
-  background: var(--accent-dark);
+  background: #8c3f1b;
 }
 
 .button-dark {
@@ -420,6 +420,7 @@ h3 {
 
 .feature-zx9 img {
   width: 410px;
+  height: auto;
   align-self: end;
   justify-self: center;
 }
@@ -838,8 +839,9 @@ h3 {
   color: var(--ink-soft);
 }
 
+/* Keep the footer below the initial viewport while the browser restores the cart. */
 .checkout-page {
-  min-height: 70vh;
+  min-height: calc(100svh - 92px);
   background: var(--warm);
 }
 
@@ -885,6 +887,10 @@ h3 {
 .narrow-empty {
   max-width: 760px;
   text-align: center;
+}
+
+.checkout-empty {
+  margin-inline: auto;
 }
 
 .narrow-empty .button {
@@ -1744,6 +1750,10 @@ legend {
 
   .header-inner {
     min-height: 80px;
+  }
+
+  .checkout-page {
+    min-height: calc(100svh - 80px);
   }
 
   .wordmark {

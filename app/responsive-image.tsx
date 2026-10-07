@@ -20,6 +20,7 @@ export function ResponsiveImage({
         src={source.mobile}
         alt={alt}
         loading={loading}
+        fetchPriority={loading === "eager" ? "high" : "auto"}
         decoding="async"
       />
     </picture>

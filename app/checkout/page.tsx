@@ -134,7 +134,7 @@ function fieldErrorMessage(errors: unknown[]): string | undefined {
 }
 
 export default function CheckoutPage() {
-  const { items, clearCart } = useCart();
+  const { items, hydrated, clearCart } = useCart();
   const { addOrder, markPaid, orders } = useOrders();
   const { settings } = usePayeeSettings();
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
@@ -229,6 +229,7 @@ export default function CheckoutPage() {
       onSubmit: checkoutSchema,
     },
     onSubmit: async ({ value }) => {
+      if (!hydrated || detailedItems.length === 0) return;
       setCheckoutError(null);
       const order = buildOrder({
         id: createOrderId(),
@@ -298,18 +299,20 @@ export default function CheckoutPage() {
 
   const returnedOrder = orders.find((order) => order.id === returnedOrderId);
 
-  if (!detailedItems.length && confirmation === null) {
+  if (hydrated && !detailedItems.length && confirmation === null) {
     return (
       <section className="checkout-page section">
-        <div className="container narrow-empty">
-          <p className="eyebrow">Checkout</p>
-          <h1>{canceled ? "Card checkout canceled" : "Your cart is empty"}</h1>
-          {canceled ? (
-            <CanceledCheckoutNotice order={returnedOrder} />
-          ) : (
-            <p>Add a product before starting checkout. Your cart is saved only in this browser.</p>
-          )}
-          <Link className="button button-primary" href="/headphones">Browse headphones</Link>
+        <div className="container">
+          <div className="narrow-empty checkout-empty">
+            <p className="eyebrow">Checkout</p>
+            <h1>{canceled ? "Card checkout canceled" : "Your cart is empty"}</h1>
+            {canceled ? (
+              <CanceledCheckoutNotice order={returnedOrder} />
+            ) : (
+              <p>Add a product before starting checkout. Your cart is saved only in this browser.</p>
+            )}
+            <Link className="button button-primary" href="/headphones">Browse headphones</Link>
+          </div>
         </div>
       </section>
     );
@@ -324,6 +327,7 @@ export default function CheckoutPage() {
             id="checkout-form"
             className="checkout-form"
             noValidate
+            aria-busy={!hydrated}
             onSubmit={(event) => {
               event.preventDefault();
               event.stopPropagation();
@@ -347,7 +351,7 @@ export default function CheckoutPage() {
               {checkoutError ? <p className="stack-hint">{checkoutError}</p> : null}
             </div>
 
-            <fieldset>
+            <fieldset disabled={!hydrated}>
               <legend>Billing details</legend>
               <div className="form-grid">
                 {fields.slice(0, 3).map((field) => (
@@ -358,7 +362,7 @@ export default function CheckoutPage() {
               </div>
             </fieldset>
 
-            <fieldset>
+            <fieldset disabled={!hydrated}>
               <legend>Shipping info</legend>
               <div className="form-grid">
                 {fields.slice(3).map((field) => (
@@ -369,7 +373,7 @@ export default function CheckoutPage() {
               </div>
             </fieldset>
 
-            <fieldset>
+            <fieldset disabled={!hydrated}>
               <legend>Payment details</legend>
               <form.Field name="payment">
                 {(field) => (
@@ -440,35 +444,41 @@ export default function CheckoutPage() {
               </form.Field>
             </fieldset>
 
-            <button className="button button-primary button-block mobile-order-button" type="submit" disabled={redirecting}>
-              {redirecting ? "Opening Stripe…" : `Place order · ${formattedTotal} USD`}
+            <button className="button button-primary button-block mobile-order-button" type="submit" disabled={!hydrated || redirecting}>
+              {!hydrated ? "Loading cart…" : redirecting ? "Opening Stripe…" : `Place order · ${formattedTotal} USD`}
             </button>
           </form>
 
           <aside className="order-summary" aria-labelledby="summary-title">
             <h2 id="summary-title">Summary</h2>
-            <ul className="summary-list">
-              {detailedItems.map(({ product, quantity }) => (
-                <li key={product.productId}>
-                  <img src={product.cartImage} alt="" width="72" height="72" />
-                  <div><strong>{product.shortName}</strong><span>{formatPrice(product.price)}</span></div>
-                  <span>×{quantity}</span>
-                </li>
-              ))}
-            </ul>
-            <dl className="totals">
-              <div><dt>Subtotal (USD)</dt><dd>{formatUsd(subtotal)}</dd></div>
-              <div><dt>Demo shipping (USD)</dt><dd>{formatUsd(shipping)}</dd></div>
-              <div><dt>Demo ITBIS 18% (USD)</dt><dd>{formatUsd(tax)}</dd></div>
-              <div className="grand-total"><dt>Grand total (USD)</dt><dd>{formatUsd(grandTotal)}</dd></div>
-            </dl>
-            <p className="stack-hint">
-              Demo DOP equivalent at {DEMO_USD_TO_DOP} DOP / USD: {formatDopFromUsd(grandTotal)}.
-              Not a live FX quote or tax filing.
-            </p>
-            <button className="button button-primary button-block desktop-order-button" type="submit" form="checkout-form" disabled={redirecting}>
-              {redirecting ? "Opening Stripe…" : "Place order"}
-            </button>
+            {hydrated ? (
+              <>
+                <ul className="summary-list">
+                  {detailedItems.map(({ product, quantity }) => (
+                    <li key={product.productId}>
+                      <img src={product.cartImage} alt="" width="72" height="72" />
+                      <div><strong>{product.shortName}</strong><span>{formatPrice(product.price)}</span></div>
+                      <span>×{quantity}</span>
+                    </li>
+                  ))}
+                </ul>
+                <dl className="totals">
+                  <div><dt>Subtotal (USD)</dt><dd>{formatUsd(subtotal)}</dd></div>
+                  <div><dt>Demo shipping (USD)</dt><dd>{formatUsd(shipping)}</dd></div>
+                  <div><dt>Demo ITBIS 18% (USD)</dt><dd>{formatUsd(tax)}</dd></div>
+                  <div className="grand-total"><dt>Grand total (USD)</dt><dd>{formatUsd(grandTotal)}</dd></div>
+                </dl>
+                <p className="stack-hint">
+                  Demo DOP equivalent at {DEMO_USD_TO_DOP} DOP / USD: {formatDopFromUsd(grandTotal)}.
+                  Not a live FX quote or tax filing.
+                </p>
+                <button className="button button-primary button-block desktop-order-button" type="submit" form="checkout-form" disabled={!hydrated || redirecting}>
+                  {redirecting ? "Opening Stripe…" : "Place order"}
+                </button>
+              </>
+            ) : (
+              <p role="status">Loading your saved cart…</p>
+            )}
           </aside>
         </div>
       </div>

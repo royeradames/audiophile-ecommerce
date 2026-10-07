@@ -6,6 +6,9 @@ import { BestGear, CategoryLinks } from "./shared-sections";
 export default function HomePage() {
   return (
     <>
+      <link rel="preload" as="image" href="/images/home/desktop/image-hero.jpg" media="(width > 900px)" fetchPriority="high" />
+      <link rel="preload" as="image" href="/images/home/tablet/image-hero.jpg" media="(620px < width <= 900px)" fetchPriority="high" />
+      <link rel="preload" as="image" href="/images/home/mobile/image-hero.jpg" media="(width <= 620px)" fetchPriority="high" />
       <section className="hero" aria-labelledby="hero-title">
         <div className="container hero-inner">
           <div className="hero-copy">
@@ -33,6 +36,8 @@ export default function HomePage() {
             <img
               src="/images/home/desktop/image-speaker-zx9.png"
               alt="ZX9 speaker in black"
+              width="756"
+              height="918"
               loading="lazy"
             />
             <div>

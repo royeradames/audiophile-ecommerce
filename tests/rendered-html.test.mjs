@@ -156,3 +156,14 @@ test("keeps state, privacy, accessibility, and legibility contracts explicit", a
   assert.match(css, /:focus-visible/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 });
+
+test("checkout reserves its form while the browser restores its cart", async () => {
+  const response = await render("/checkout");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Loading your saved cart/);
+  assert.match(html, /id="checkout-form"/);
+  assert.match(html, /aria-busy="true"/);
+  assert.match(html, /<fieldset disabled/);
+  assert.doesNotMatch(html, /Your cart is empty/);
+});
