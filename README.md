@@ -28,6 +28,8 @@ Stripe test keys, webhook secret, and optional `STAFF_PASSWORD` are listed in `.
 
 Payment click-through (every method, test cards, what not to send): [docs/payment-testing.md](docs/payment-testing.md).
 
+To check cancelled-checkout recovery, start a native production build on `http://127.0.0.1:4346`, install Google Chrome and make Playwright available, then run `node tests/checkout-cancel.browser.mjs`. `PLAYWRIGHT_MODULE` can point to an existing Playwright `index.mjs`; `AUDIOPHILE_URL` selects another localhost server. The test uses a fresh browser, fictional details and a local substitute for Stripe's redirect. It checks pending-order retry after cart clearing without contacting Stripe or changing payment settings. Results and screenshots go to ignored `outputs/`.
+
 Webhook URL: `/api/stripe/webhook`. Use the Stripe CLI: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
 
 AZUL affiliation, live bank numbers, and a live merchant account are human steps. They are tracked on `/payments`, not completed by this repo.

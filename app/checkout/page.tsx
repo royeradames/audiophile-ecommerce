@@ -11,7 +11,7 @@ import { checkoutTotals, DEMO_USD_TO_DOP, formatDopFromUsd, formatUsd } from "..
 import { useCart } from "../cart-context";
 import { CardPayment } from "../card-payment";
 import { useOrders } from "../order-context";
-import { buildOrder } from "../order-record";
+import { buildOrder, orderStatusLabels, type OrderRecord } from "../order-record";
 import { PaymentInstructions } from "../payment-instructions";
 import {
   confirmationCopy,
@@ -133,11 +133,12 @@ function fieldErrorMessage(errors: unknown[]): string | undefined {
 
 export default function CheckoutPage() {
   const { items, clearCart } = useCart();
-  const { addOrder, markPaid } = useOrders();
+  const { addOrder, markPaid, orders } = useOrders();
   const { settings } = usePayeeSettings();
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [canceled, setCanceled] = useState(false);
+  const [returnedOrderId, setReturnedOrderId] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const panelRef = useRef<HTMLElement>(null);
@@ -198,7 +199,9 @@ export default function CheckoutPage() {
       if (cancelled) {
         return;
       }
-      setCanceled(new URLSearchParams(window.location.search).get("canceled") === "1");
+      const params = new URLSearchParams(window.location.search);
+      setCanceled(params.get("canceled") === "1");
+      setReturnedOrderId(params.get("order"));
     });
     return () => {
       cancelled = true;
@@ -291,13 +294,19 @@ export default function CheckoutPage() {
     },
   });
 
+  const returnedOrder = orders.find((order) => order.id === returnedOrderId);
+
   if (!detailedItems.length && confirmation === null) {
     return (
       <section className="checkout-page section">
         <div className="container narrow-empty">
           <p className="eyebrow">Checkout</p>
-          <h1>Your cart is empty</h1>
-          <p>Add a product before starting checkout. Your cart is saved only in this browser.</p>
+          <h1>{canceled ? "Card checkout canceled" : "Your cart is empty"}</h1>
+          {canceled ? (
+            <CanceledCheckoutNotice order={returnedOrder} />
+          ) : (
+            <p>Add a product before starting checkout. Your cart is saved only in this browser.</p>
+          )}
           <Link className="button button-primary" href="/headphones">Browse headphones</Link>
         </div>
       </section>
@@ -331,10 +340,7 @@ export default function CheckoutPage() {
                 details come from the <Link href="/payments">payment stack</Link>.
               </p>
               {canceled ? (
-                <p className="stack-hint">
-                  Stripe test Checkout was canceled. The order stays unpaid in{" "}
-                  <Link href="/orders">pending orders</Link>.
-                </p>
+                <CanceledCheckoutNotice order={returnedOrder} />
               ) : null}
               {checkoutError ? <p className="stack-hint">{checkoutError}</p> : null}
             </div>
@@ -541,6 +547,26 @@ export default function CheckoutPage() {
         </div>
       ) : null}
     </section>
+  );
+}
+
+function CanceledCheckoutNotice({ order }: { order: OrderRecord | undefined }) {
+  return (
+    <div role="status">
+      <p>Stripe test Checkout was canceled. Returning here does not mark an order paid.</p>
+      {order?.status === "pending_hosted" ? (
+        <>
+          <p>Order {order.id} is still unpaid. You can retry its payment without placing another order.</p>
+          <Link className="button button-primary" href={`/checkout/pay?order=${encodeURIComponent(order.id)}`}>
+            Retry Stripe test payment
+          </Link>
+        </>
+      ) : order ? (
+        <p>Saved order {order.id}: {orderStatusLabels[order.status]}. This return did not change its status.</p>
+      ) : (
+        <p>The order is not available in this browser. Use the browser where you started checkout to find it, or return to browsing.</p>
+      )}
+    </div>
   );
 }
 
