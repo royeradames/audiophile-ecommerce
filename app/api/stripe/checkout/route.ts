@@ -1,7 +1,7 @@
 import { createStripeCheckoutSession } from "../../../stripe-api";
 import { stripePublicConfig } from "../../../stripe-env";
 import { requestOrigin } from "../../../request-origin";
-import { usdToCents } from "../../../checkout-totals";
+import { readPaymentRequest } from "../../../payment-request";
 
 export async function POST(request: Request) {
   const config = stripePublicConfig();
@@ -15,36 +15,25 @@ export async function POST(request: Request) {
     );
   }
 
-  const payload = (await request.json()) as {
-    orderId?: string;
-    amount?: number;
-    email?: string;
-    description?: string;
-  };
-  const orderId = payload.orderId?.trim() ?? "";
-  const email = payload.email?.trim() ?? "";
-  const description = payload.description?.trim() || `Audiophile ${orderId}`;
-  const amount = payload.amount;
-
-  if (!orderId.startsWith("AUD-") || !email || typeof amount !== "number" || amount <= 0) {
-    return Response.json({ error: "orderId, email, and amount are required." }, { status: 400 });
+  const payment = await readPaymentRequest(request);
+  if (!payment.ok) {
+    return Response.json({ error: payment.error }, { status: payment.status });
   }
 
   try {
     const session = await createStripeCheckoutSession({
-      orderId,
-      amountCents: usdToCents(amount),
-      email,
+      orderId: payment.orderId,
+      amountCents: payment.amountCents,
+      email: payment.email,
       origin: requestOrigin(request),
-      description,
+      description: payment.description,
     });
     const url = typeof session.url === "string" ? session.url : null;
     if (!url) {
       return Response.json({ error: "Stripe did not return a Checkout URL." }, { status: 502 });
     }
     return Response.json({ url });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Stripe Checkout failed.";
-    return Response.json({ error: message }, { status: 502 });
+  } catch {
+    return Response.json({ error: "Could not start Stripe test Checkout. Please try again." }, { status: 502 });
   }
 }

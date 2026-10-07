@@ -24,6 +24,7 @@ import {
 } from "../payment-methods";
 import { usePayeeSettings } from "../payee-context";
 import { startHostedCheckout } from "../stripe-client";
+import type { PaymentRequest } from "../payment-request";
 
 const fieldOrder = [
   "name",
@@ -89,6 +90,7 @@ const checkoutSchema = z
 type CheckoutValues = z.input<typeof checkoutSchema>;
 
 type Confirmation = {
+  items: PaymentRequest["items"];
   total: number;
   orderId: string;
   payment: PaymentMethod;
@@ -259,9 +261,8 @@ export default function CheckoutPage() {
         setRedirecting(true);
         const result = await startHostedCheckout({
           orderId: order.id,
-          amount: order.grandTotal,
+          items: order.lines,
           email: order.customer.email,
-          description: order.lines.map((line) => `${line.quantity}× ${line.name}`).join(", "),
         });
         if (result.ok) {
           clearCart();
@@ -273,6 +274,7 @@ export default function CheckoutPage() {
       }
 
       setConfirmation({
+        items: order.lines,
         total: order.grandTotal,
         orderId: order.id,
         payment: order.payment,
@@ -500,7 +502,7 @@ export default function CheckoutPage() {
             {confirmation.payment === "element" && !confirmation.paid ? (
               <CardPayment
                 orderId={confirmation.orderId}
-                amount={confirmation.total}
+                items={confirmation.items}
                 email={confirmation.email}
                 onPaid={() => {
                   markPaid(confirmation.orderId);
@@ -516,9 +518,8 @@ export default function CheckoutPage() {
                   setCheckoutError(null);
                   const result = await startHostedCheckout({
                     orderId: confirmation.orderId,
-                    amount: confirmation.total,
+                    items: confirmation.items,
                     email: confirmation.email,
-                    description: `Audiophile ${confirmation.orderId}`,
                   });
                   if (result.ok) {
                     window.location.assign(result.url);
