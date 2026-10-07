@@ -302,15 +302,17 @@ export default function CheckoutPage() {
   if (hydrated && !detailedItems.length && confirmation === null) {
     return (
       <section className="checkout-page section">
-        <div className="container narrow-empty">
-          <p className="eyebrow">Checkout</p>
-          <h1>{canceled ? "Card checkout canceled" : "Your cart is empty"}</h1>
-          {canceled ? (
-            <CanceledCheckoutNotice order={returnedOrder} />
-          ) : (
-            <p>Add a product before starting checkout. Your cart is saved only in this browser.</p>
-          )}
-          <Link className="button button-primary" href="/headphones">Browse headphones</Link>
+        <div className="container">
+          <div className="narrow-empty checkout-empty">
+            <p className="eyebrow">Checkout</p>
+            <h1>{canceled ? "Card checkout canceled" : "Your cart is empty"}</h1>
+            {canceled ? (
+              <CanceledCheckoutNotice order={returnedOrder} />
+            ) : (
+              <p>Add a product before starting checkout. Your cart is saved only in this browser.</p>
+            )}
+            <Link className="button button-primary" href="/headphones">Browse headphones</Link>
+          </div>
         </div>
       </section>
     );
