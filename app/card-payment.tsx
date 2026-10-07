@@ -76,16 +76,18 @@ export function CardPayment(props: CardPaymentProps) {
         appearance: { theme: "stripe" },
       }}
     >
-      <CardPaymentForm amount={amount} onPaid={props.onPaid} />
+      <CardPaymentForm amount={amount} email={props.email} onPaid={props.onPaid} />
     </Elements>
   );
 }
 
 function CardPaymentForm({
   amount,
+  email,
   onPaid,
 }: {
   amount: number;
+  email: string;
   onPaid: () => void;
 }) {
   const stripe = useStripe();
@@ -125,7 +127,13 @@ function CardPaymentForm({
         setSubmitting(false);
       }}
     >
-      <PaymentElement options={{ layout: "tabs", wallets: { applePay: "auto", googlePay: "auto" } }} />
+      <PaymentElement
+        options={{
+          layout: "tabs",
+          defaultValues: { billingDetails: { email } },
+          wallets: { applePay: "auto", googlePay: "auto" },
+        }}
+      />
       {error ? <p className="stack-hint">{error}</p> : null}
       <button className="button button-primary button-block" type="submit" disabled={!stripe || submitting}>
         {submitting ? "Paying…" : `Pay ${formatUsd(amount)} (Stripe test)`}
