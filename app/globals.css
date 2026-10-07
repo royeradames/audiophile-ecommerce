@@ -420,6 +420,7 @@ h3 {
 
 .feature-zx9 img {
   width: 410px;
+  height: auto;
   align-self: end;
   justify-self: center;
 }
