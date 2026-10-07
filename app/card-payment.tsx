@@ -1,7 +1,8 @@
 "use client";
 
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
-import { loadStripe, type Stripe } from "@stripe/stripe-js";
+import type { Stripe } from "@stripe/stripe-js";
+import { loadStripe } from "@stripe/stripe-js/pure";
 import { useEffect, useMemo, useState } from "react";
 import { createPaymentIntent, fetchStripeConfig } from "./stripe-client";
 import type { PaymentRequest } from "./payment-request";

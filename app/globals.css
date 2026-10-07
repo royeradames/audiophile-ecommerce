@@ -173,12 +173,12 @@ h3 {
 }
 
 .button-primary {
-  background: var(--accent);
+  background: var(--accent-dark);
   color: #fff;
 }
 
 .button-primary:hover {
-  background: var(--accent-dark);
+  background: #8c3f1b;
 }
 
 .button-dark {
