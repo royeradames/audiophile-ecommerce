@@ -62,7 +62,7 @@ function CheckoutPayClient() {
         {paid ? null : order.payment === "element" ? (
           <CardPayment
             orderId={order.id}
-            amount={order.grandTotal}
+            items={order.lines}
             email={order.customer.email}
             onPaid={() => {
               markPaid(order.id);
@@ -76,9 +76,8 @@ function CheckoutPayClient() {
             onClick={async () => {
               const result = await startHostedCheckout({
                 orderId: order.id,
-                amount: order.grandTotal,
+                items: order.lines,
                 email: order.customer.email,
-                description: order.lines.map((line) => `${line.quantity}× ${line.name}`).join(", "),
               });
               if (result.ok) {
                 window.location.assign(result.url);

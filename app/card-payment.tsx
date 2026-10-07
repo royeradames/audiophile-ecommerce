@@ -4,17 +4,16 @@ import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { useEffect, useMemo, useState } from "react";
 import { createPaymentIntent, fetchStripeConfig } from "./stripe-client";
+import type { PaymentRequest } from "./payment-request";
 import { formatUsd } from "./checkout-totals";
 
-type CardPaymentProps = {
-  orderId: string;
-  amount: number;
-  email: string;
+type CardPaymentProps = PaymentRequest & {
   onPaid: () => void;
 };
 
 export function CardPayment(props: CardPaymentProps) {
   const [publishableKey, setPublishableKey] = useState<string | null>(null);
+  const [amount, setAmount] = useState<number | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,7 +34,7 @@ export function CardPayment(props: CardPaymentProps) {
       }
       const intent = await createPaymentIntent({
         orderId: props.orderId,
-        amount: props.amount,
+        items: props.items,
         email: props.email,
       });
       if (cancelled) {
@@ -47,11 +46,12 @@ export function CardPayment(props: CardPaymentProps) {
       }
       setPublishableKey(config.publishableKey);
       setClientSecret(intent.clientSecret);
+      setAmount(intent.amount);
     })();
     return () => {
       cancelled = true;
     };
-  }, [props.amount, props.email, props.orderId]);
+  }, [props.items, props.email, props.orderId]);
 
   const stripePromise = useMemo(() => {
     if (!publishableKey) {
@@ -63,7 +63,7 @@ export function CardPayment(props: CardPaymentProps) {
   if (error) {
     return <p className="stack-hint">{error}</p>;
   }
-  if (!stripePromise || !clientSecret) {
+  if (!stripePromise || !clientSecret || amount === null) {
     return <p className="stack-hint">Preparing Stripe test card fields…</p>;
   }
 
@@ -75,7 +75,7 @@ export function CardPayment(props: CardPaymentProps) {
         appearance: { theme: "stripe" },
       }}
     >
-      <CardPaymentForm amount={props.amount} onPaid={props.onPaid} />
+      <CardPaymentForm amount={amount} onPaid={props.onPaid} />
     </Elements>
   );
 }

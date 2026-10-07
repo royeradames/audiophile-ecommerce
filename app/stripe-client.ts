@@ -1,3 +1,5 @@
+import { z } from "zod";
+import type { PaymentRequest } from "./payment-request";
 import type { StripePublicConfig } from "./stripe-env";
 
 export async function fetchStripeConfig(): Promise<StripePublicConfig> {
@@ -8,39 +10,54 @@ export async function fetchStripeConfig(): Promise<StripePublicConfig> {
   return (await response.json()) as StripePublicConfig;
 }
 
-export async function startHostedCheckout(input: {
-  orderId: string;
-  amount: number;
-  email: string;
-  description: string;
-}) {
-  const response = await fetch("/api/stripe/checkout", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(input),
+function paymentBody(input: PaymentRequest) {
+  return JSON.stringify({
+    orderId: input.orderId,
+    email: input.email,
+    items: input.items.map(({ productId, quantity }) => ({ productId, quantity })),
   });
-  const body = (await response.json()) as { url?: string; error?: string };
-  if (!response.ok || !body.url) {
-    return { ok: false as const, error: body.error || "Could not start Stripe Checkout." };
-  }
-  return { ok: true as const, url: body.url };
 }
 
-export async function createPaymentIntent(input: {
-  orderId: string;
-  amount: number;
-  email: string;
-}) {
-  const response = await fetch("/api/stripe/payment-intent", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  const body = (await response.json()) as { clientSecret?: string; error?: string };
-  if (!response.ok || !body.clientSecret) {
-    return { ok: false as const, error: body.error || "Could not start the card form." };
+const paymentErrorSchema = z.object({ error: z.string().min(1) });
+const checkoutResponseSchema = z.object({ url: z.url() });
+const intentResponseSchema = z.object({ clientSecret: z.string().min(1), amount: z.number().positive().finite() });
+
+export async function startHostedCheckout(input: PaymentRequest) {
+  const fallback = "Could not start Stripe test Checkout. Please try again.";
+  try {
+    const response = await fetch("/api/stripe/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: paymentBody(input),
+    });
+    const body: unknown = await response.json();
+    const parsed = checkoutResponseSchema.safeParse(body);
+    if (!response.ok || !parsed.success) {
+      return { ok: false as const, error: paymentErrorSchema.safeParse(body).data?.error ?? fallback };
+    }
+    return { ok: true as const, url: parsed.data.url };
+  } catch {
+    return { ok: false as const, error: fallback };
   }
-  return { ok: true as const, clientSecret: body.clientSecret };
+}
+
+export async function createPaymentIntent(input: PaymentRequest) {
+  const fallback = "Could not start the Stripe test card form. Please try again.";
+  try {
+    const response = await fetch("/api/stripe/payment-intent", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: paymentBody(input),
+    });
+    const body: unknown = await response.json();
+    const parsed = intentResponseSchema.safeParse(body);
+    if (!response.ok || !parsed.success) {
+      return { ok: false as const, error: paymentErrorSchema.safeParse(body).data?.error ?? fallback };
+    }
+    return { ok: true as const, ...parsed.data };
+  } catch {
+    return { ok: false as const, error: fallback };
+  }
 }
 
 export async function fetchStripeSession(sessionId: string) {
