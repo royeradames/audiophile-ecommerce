@@ -6,6 +6,13 @@ const hostname = new URL(base).hostname;
 assert(['localhost', '127.0.0.1'].includes(hostname) || (hostname.startsWith('audiophile-') && hostname.endsWith('.vercel.app')), 'Use a local server or this app’s preview.');
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const context = await browser.newContext({ viewport: { width: 400, height: 900 } });
+if (process.env.VERCEL_OIDC_TOKEN) {
+  await context.route('**/*', (route) => route.continue({
+    headers: new URL(route.request().url()).origin === new URL(base).origin
+      ? { ...route.request().headers(), 'x-vercel-trusted-oidc-idp-token': process.env.VERCEL_OIDC_TOKEN }
+      : route.request().headers(),
+  }));
+}
 const page = await context.newPage();
 const errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
@@ -53,7 +60,7 @@ try {
       await page.locator(`#${id}`).fill(value);
     }
     await page.locator(`input[name="payment"][value="${payment}"]`).check();
-    await page.getByRole('button', { name: 'Place order', exact: true }).click();
+    await page.getByRole('button', { name: /^Place order/ }).click();
   }
   await fillCheckout('hosted');
   await page.getByRole('button', { name: 'Retry Stripe test Checkout', exact: true }).click();
