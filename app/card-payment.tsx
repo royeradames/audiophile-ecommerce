@@ -4,7 +4,7 @@ import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-
 import type { Stripe } from "@stripe/stripe-js";
 import { loadStripe } from "@stripe/stripe-js/pure";
 import { useEffect, useMemo, useState } from "react";
-import { createPaymentIntent, fetchStripeConfig } from "./stripe-client";
+import { createPaymentIntent, fetchStripeConfig, fetchStripePaymentIntent } from "./stripe-client";
 import type { PaymentRequest } from "./payment-request";
 import { formatUsd } from "./checkout-totals";
 
@@ -100,7 +100,7 @@ function CardPaymentForm({
       className="card-payment"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (!stripe || !elements) {
+        if (!stripe || !elements || submitting) {
           return;
         }
         setSubmitting(true);
@@ -119,6 +119,9 @@ function CardPaymentForm({
         }
         const status = result.paymentIntent?.status;
         if (status === "succeeded") {
+          // Tell the store now; the webhook may arrive later or, on a
+          // protected preview, not at all. Recording is idempotent.
+          await fetchStripePaymentIntent(result.paymentIntent.id).catch(() => null);
           onPaid();
           setSubmitting(false);
           return;
@@ -135,7 +138,7 @@ function CardPaymentForm({
         }}
       />
       {error ? <p className="stack-hint">{error}</p> : null}
-      <button className="button button-primary button-block" type="submit" disabled={!stripe || submitting}>
+      <button className="button button-primary button-block" type="submit" disabled={!stripe} aria-busy={submitting}>
         {submitting ? "Paying…" : `Pay ${formatUsd(amount)} (Stripe test)`}
       </button>
     </form>

@@ -97,6 +97,27 @@ export function buildOrder(draft: OrderDraft): OrderRecord {
   };
 }
 
+/** This browser's copy of a server order, with the details typed at checkout. */
+export function fromServerOrder(
+  summary: Pick<OrderRecord, "id" | "createdAt" | "status" | "payment" | "pickupCity" | "lines" | "subtotal" | "shipping" | "vat" | "grandTotal" | "settledAt">,
+  customer: OrderCustomer,
+): OrderRecord {
+  return {
+    id: summary.id,
+    createdAt: summary.createdAt,
+    status: summary.status,
+    payment: summary.payment,
+    pickupCity: summary.pickupCity,
+    customer,
+    lines: summary.lines,
+    subtotal: summary.subtotal,
+    shipping: summary.shipping,
+    vat: summary.vat,
+    grandTotal: summary.grandTotal,
+    settledAt: summary.settledAt,
+  };
+}
+
 export function markPaid(order: OrderRecord, settledAt: string): OrderRecord {
   if (!canMarkPaid(order)) {
     return order;

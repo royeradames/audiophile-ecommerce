@@ -11,7 +11,8 @@ import { checkoutTotals, DEMO_USD_TO_DOP, formatDopFromUsd, formatUsd } from "..
 import { useCart } from "../cart-context";
 import { CardPayment } from "../card-payment";
 import { useOrders } from "../order-context";
-import { buildOrder, orderStatusLabels, type OrderRecord } from "../order-record";
+import { buildOrder, fromServerOrder, orderStatusLabels, type OrderRecord } from "../order-record";
+import type { StoreFeatures } from "../order-api";
 import { PaymentInstructions } from "../payment-instructions";
 import {
   confirmationCopy,
@@ -24,6 +25,7 @@ import {
 } from "../payment-methods";
 import { usePayeeSettings } from "../payee-context";
 import { startHostedCheckout } from "../stripe-client";
+import { createServerOrder, fetchCustomer, fetchStoreFeatures } from "../store-client";
 import type { PaymentRequest } from "../payment-request";
 
 const fieldOrder = [
@@ -97,7 +99,17 @@ type Confirmation = {
   pickupCity: PickupCity | "";
   email: string;
   paid: boolean;
+  /** Stored on the server, so its status link works in any browser. */
+  durable: boolean;
+  savedToAccount: boolean;
 };
+
+type CustomerBanner =
+  | { state: "loading" }
+  | { state: "coming_soon" }
+  | { state: "signed_in"; name: string }
+  | { state: "signed_out" }
+  | { state: "unavailable" };
 
 const defaultValues: CheckoutValues = {
   name: "",
@@ -135,13 +147,20 @@ function fieldErrorMessage(errors: unknown[]): string | undefined {
 
 export default function CheckoutPage() {
   const { items, hydrated, clearCart } = useCart();
-  const { addOrder, markPaid, orders } = useOrders();
+  const { addOrder, saveOrder, markPaid, orders } = useOrders();
   const { settings } = usePayeeSettings();
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [canceled, setCanceled] = useState(false);
   const [returnedOrderId, setReturnedOrderId] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [features, setFeatures] = useState<StoreFeatures | null>(null);
+  const [account, setAccount] = useState<CustomerBanner>({ state: "loading" });
+  // One key per distinct submission: a retry after a lost response returns
+  // the order the server already saved instead of creating a second one.
+  const submission = useRef<{ fingerprint: string; key: string } | null>(null);
+  const busy = saving || redirecting;
   const headingRef = useRef<HTMLHeadingElement>(null);
   const panelRef = useRef<HTMLElement>(null);
 
@@ -210,6 +229,28 @@ export default function CheckoutPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const available = await fetchStoreFeatures();
+      if (cancelled) return;
+      setFeatures(available);
+      if (available.accounts !== "enabled") {
+        setAccount({ state: "coming_soon" });
+        return;
+      }
+      try {
+        const customer = await fetchCustomer();
+        if (!cancelled) setAccount(customer ? { state: "signed_in", name: customer.name || customer.email } : { state: "signed_out" });
+      } catch {
+        if (!cancelled) setAccount({ state: "unavailable" });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const detailedItems = useMemo(
     () =>
       items.flatMap((line) => {
@@ -229,40 +270,71 @@ export default function CheckoutPage() {
       onSubmit: checkoutSchema,
     },
     onSubmit: async ({ value }) => {
-      if (!hydrated || detailedItems.length === 0) return;
+      if (!hydrated || detailedItems.length === 0 || busy) return;
       setCheckoutError(null);
-      const order = buildOrder({
-        id: createOrderId(),
-        createdAt: new Date().toISOString(),
-        payment: value.payment,
-        pickupCity: value.pickupCity === "" ? "" : value.pickupCity,
-        customer: {
-          name: value.name.trim(),
-          email: value.email.trim(),
-          phone: value.phone.trim(),
-          address: value.address.trim(),
-          zip: value.zip.trim(),
-          city: value.city.trim(),
-          country: value.country.trim(),
-        },
-        lines: detailedItems.map((line) => ({
-          productId: line.product.productId,
-          name: line.product.shortName,
-          quantity: line.quantity,
-          unitPrice: line.product.price,
-        })),
-        subtotal,
-        shipping,
-        vat: tax,
-        grandTotal,
-      });
-      addOrder(order);
+      const customer = {
+        name: value.name.trim(),
+        email: value.email.trim(),
+        phone: value.phone.trim(),
+        address: value.address.trim(),
+        zip: value.zip.trim(),
+        city: value.city.trim(),
+        country: value.country.trim(),
+      };
+      const pickupCity: PickupCity | "" = value.payment === "in_person" ? value.pickupCity : "";
+      const cart = detailedItems.map((line) => ({ productId: line.product.productId, quantity: line.quantity }));
+      const available = features ?? await fetchStoreFeatures();
+
+      let order: OrderRecord;
+      let savedToAccount = false;
+      if (available.durableOrders) {
+        const fingerprint = JSON.stringify([value.payment, pickupCity, customer, cart]);
+        if (submission.current?.fingerprint !== fingerprint) {
+          submission.current = { fingerprint, key: crypto.randomUUID() };
+        }
+        setSaving(true);
+        const saved = await createServerOrder({
+          requestKey: submission.current.key,
+          payment: value.payment,
+          pickupCity,
+          customer,
+          items: cart,
+        });
+        setSaving(false);
+        if (!saved.ok) {
+          setCheckoutError(saved.error);
+          return;
+        }
+        submission.current = null;
+        order = fromServerOrder(saved.order, customer);
+        savedToAccount = saved.order.savedToAccount;
+        saveOrder(order);
+      } else {
+        order = buildOrder({
+          id: createOrderId(),
+          createdAt: new Date().toISOString(),
+          payment: value.payment,
+          pickupCity,
+          customer,
+          lines: detailedItems.map((line) => ({
+            productId: line.product.productId,
+            name: line.product.shortName,
+            quantity: line.quantity,
+            unitPrice: line.product.price,
+          })),
+          subtotal,
+          shipping,
+          vat: tax,
+          grandTotal,
+        });
+        addOrder(order);
+      }
 
       if (value.payment === "hosted") {
         setRedirecting(true);
         const result = await startHostedCheckout({
           orderId: order.id,
-          items: order.lines,
+          items: cart,
           email: order.customer.email,
         });
         if (result.ok) {
@@ -275,13 +347,15 @@ export default function CheckoutPage() {
       }
 
       setConfirmation({
-        items: order.lines,
+        items: cart,
         total: order.grandTotal,
         orderId: order.id,
         payment: order.payment,
         pickupCity: order.pickupCity,
         email: order.customer.email,
         paid: false,
+        durable: available.durableOrders,
+        savedToAccount,
       });
       clearCart();
       requestAnimationFrame(() => headingRef.current?.focus());
@@ -345,10 +419,11 @@ export default function CheckoutPage() {
                 a dedicated AZUL terminal in the Dominican Republic. Payee
                 details come from the <Link href="/payments">payment stack</Link>.
               </p>
+              <AccountNotice account={account} />
               {canceled ? (
                 <CanceledCheckoutNotice order={returnedOrder} />
               ) : null}
-              {checkoutError ? <p className="stack-hint">{checkoutError}</p> : null}
+              {checkoutError ? <p className="stack-hint" role="alert">{checkoutError}</p> : null}
             </div>
 
             <fieldset disabled={!hydrated}>
@@ -444,8 +519,13 @@ export default function CheckoutPage() {
               </form.Field>
             </fieldset>
 
-            <button className="button button-primary button-block mobile-order-button" type="submit" disabled={!hydrated || redirecting}>
-              {!hydrated ? "Loading cart…" : redirecting ? "Opening Stripe…" : `Place order · ${formattedTotal} USD`}
+            <button
+              className="button button-primary button-block mobile-order-button"
+              type="submit"
+              disabled={!hydrated}
+              aria-busy={busy}
+            >
+              {!hydrated ? "Loading cart…" : saving ? "Saving order…" : redirecting ? "Opening Stripe…" : `Place order · ${formattedTotal} USD`}
             </button>
           </form>
 
@@ -472,8 +552,14 @@ export default function CheckoutPage() {
                   Demo DOP equivalent at {DEMO_USD_TO_DOP} DOP / USD: {formatDopFromUsd(grandTotal)}.
                   Not a live FX quote or tax filing.
                 </p>
-                <button className="button button-primary button-block desktop-order-button" type="submit" form="checkout-form" disabled={!hydrated || redirecting}>
-                  {redirecting ? "Opening Stripe…" : "Place order"}
+                <button
+                  className="button button-primary button-block desktop-order-button"
+                  type="submit"
+                  form="checkout-form"
+                  disabled={!hydrated}
+                  aria-busy={busy}
+                >
+                  {saving ? "Saving order…" : redirecting ? "Opening Stripe…" : "Place order"}
                 </button>
               </>
             ) : (
@@ -499,6 +585,14 @@ export default function CheckoutPage() {
               Order {confirmation.orderId}
             </h2>
             <p>{confirmation.paid ? "Stripe test payment recorded. This is not a live merchant charge." : confirmationCopy(confirmation.payment)}</p>
+            {confirmation.savedToAccount ? (
+              <p>Saved to your account. Find it under Account in any browser.</p>
+            ) : confirmation.durable ? (
+              <p>
+                Saved on our server. Keep this link to check the order from any browser:{" "}
+                <Link href={orderPath(confirmation.orderId)}>order {confirmation.orderId}</Link>.
+              </p>
+            ) : null}
             {confirmation.payment === "in_person" && confirmation.pickupCity ? (
               <p>Pickup in {pickupCityLabels[confirmation.pickupCity]}.</p>
             ) : null}
@@ -550,15 +644,44 @@ export default function CheckoutPage() {
               </Link>
             ) : null}
             <div className="confirmation-total"><span>Total (USD)</span><strong>{formatUsd(confirmation.total)}</strong></div>
-            <Link className="button button-outline button-block" href="/orders">
-              Open pending orders
-            </Link>
+            {confirmation.durable ? (
+              <Link className="button button-outline button-block" href={orderPath(confirmation.orderId)}>
+                View order status
+              </Link>
+            ) : (
+              <Link className="button button-outline button-block" href="/orders">
+                Open pending orders
+              </Link>
+            )}
             <Link className="button button-primary button-block" href="/" onClick={() => setConfirmation(null)}>Back to home</Link>
           </section>
         </div>
       ) : null}
     </section>
   );
+}
+
+function orderPath(orderId: string) {
+  return `/checkout/pay?order=${encodeURIComponent(orderId)}`;
+}
+
+function AccountNotice({ account }: { account: CustomerBanner }) {
+  switch (account.state) {
+    case "loading":
+      return null;
+    case "coming_soon":
+      return <p className="account-note">Customer accounts are coming soon. Guest checkout works today.</p>;
+    case "signed_in":
+      return <p className="account-note">Signed in as {account.name}. This order will be saved to your account.</p>;
+    case "signed_out":
+      return (
+        <p className="account-note">
+          Checking out as a guest. <Link href="/account">Sign in</Link> to save this order to your account.
+        </p>
+      );
+    case "unavailable":
+      return <p className="account-note">Your account could not be checked right now. Placing an order will try again.</p>;
+  }
 }
 
 function CanceledCheckoutNotice({ order }: { order: OrderRecord | undefined }) {

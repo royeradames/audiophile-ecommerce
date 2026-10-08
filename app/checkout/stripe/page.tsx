@@ -94,9 +94,11 @@ function StripeReturnBody({
             {orderId ? <p>Order {orderId}{total ? ` · ${total}` : ""}</p> : null}
           </div>
           <div className="stack-intro-actions">
-            <Link className="button button-outline" href="/orders">
-              Pending orders
-            </Link>
+            {orderId ? (
+              <Link className="button button-outline" href={`/checkout/pay?order=${encodeURIComponent(orderId)}`}>
+                View order status
+              </Link>
+            ) : null}
             <Link className="button button-primary" href="/">
               Back to home
             </Link>

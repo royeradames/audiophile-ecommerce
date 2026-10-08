@@ -151,8 +151,8 @@ export default function OrdersPage() {
           <div className="order-empty">
             <h2>No orders in this browser</h2>
             <p>
-              Add a product, place a test order, then return here. Nothing is
-              stored on a server yet.
+              Add a product, place a test order, then return here. This queue
+              lists orders placed in this browser.
             </p>
             <Link className="button button-primary" href="/headphones">
               Browse headphones

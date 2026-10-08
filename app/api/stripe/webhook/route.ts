@@ -1,6 +1,12 @@
 import { recordPaidOrder } from "../../../paid-ledger";
 import { stripeWebhookSecret } from "../../../stripe-env";
-import { orderIdFromStripeEvent, verifyStripeWebhookSignature } from "../../../stripe-webhook";
+import {
+  orderIdFromStripeEvent,
+  paymentFromStripeEvent,
+  verifyStripeWebhookSignature,
+} from "../../../stripe-webhook";
+import { claimStripeEvent, inTransaction, settleStripePayment } from "../../../server/order-store";
+import { serverRuntime } from "../../../server/runtime";
 
 export async function POST(request: Request) {
   const secret = stripeWebhookSecret();
@@ -22,10 +28,32 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid JSON payload." }, { status: 400 });
   }
 
-  const orderId = orderIdFromStripeEvent(event);
-  if (orderId) {
-    recordPaidOrder(orderId, "webhook");
+  const runtime = serverRuntime();
+  if (!runtime) {
+    // Guest-only fallback: no database, so the paid record lives in memory.
+    const orderId = orderIdFromStripeEvent(event);
+    if (orderId) {
+      recordPaidOrder(orderId, "webhook");
+    }
+    return Response.json({ received: true, orderId });
   }
 
-  return Response.json({ received: true, orderId });
+  const record = event as { id?: unknown; type?: unknown; livemode?: unknown };
+  const eventId = typeof record.id === "string" && /^evt_[A-Za-z0-9_]+$/.test(record.id) ? record.id : null;
+  const type = typeof record.type === "string" ? record.type.slice(0, 100) : "";
+  if (!eventId || record.livemode === true) {
+    return Response.json({ received: true, ignored: true });
+  }
+  const payment = paymentFromStripeEvent(event);
+  try {
+    const outcome = await inTransaction(runtime.db, async (tx) => {
+      // The claim commits with the status change, so a failed delivery is retried.
+      if (!await claimStripeEvent(tx, eventId, type, payment?.orderId ?? null)) return "duplicate";
+      return payment ? settleStripePayment(tx, payment) : "ignored";
+    });
+    return Response.json({ received: true, orderId: payment?.orderId ?? null, outcome });
+  } catch {
+    console.error(JSON.stringify({ event: "stripe_webhook_failed", type }));
+    return Response.json({ error: "The event could not be recorded. Stripe will retry it." }, { status: 500 });
+  }
 }

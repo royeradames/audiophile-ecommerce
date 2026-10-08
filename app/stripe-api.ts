@@ -73,6 +73,8 @@ export async function createStripePaymentIntent(input: {
   orderId: string;
   amountCents: number;
   email: string;
+  /** Stripe returns the same intent for a repeated key instead of creating another. */
+  idempotencyKey?: string;
 }) {
   const params = new URLSearchParams();
   params.set("amount", String(input.amountCents));
@@ -84,7 +86,10 @@ export async function createStripePaymentIntent(input: {
 
   return stripeRequest("payment_intents", {
     method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      ...(input.idempotencyKey ? { "idempotency-key": input.idempotencyKey } : {}),
+    },
     body: params,
   });
 }

@@ -2,6 +2,9 @@ import { createStripePaymentIntent, retrieveStripePaymentIntent } from "../../..
 import { recordPaidOrder } from "../../../paid-ledger";
 import { stripePublicConfig } from "../../../stripe-env";
 import { readPaymentRequest } from "../../../payment-request";
+import { paymentFromIntent } from "../../../stripe-webhook";
+import { cardIntentFor, payableOrder, recordPayment, settledPaid } from "../../../server/payments";
+import { serverRuntime } from "../../../server/runtime";
 
 export async function GET(request: Request) {
   const config = stripePublicConfig();
@@ -28,8 +31,15 @@ export async function GET(request: Request) {
       metadata && "order_id" in metadata && typeof metadata.order_id === "string"
         ? metadata.order_id
         : null;
-    const paid = status === "succeeded";
-    if (paid && orderId) {
+    let paid = status === "succeeded";
+    const runtime = serverRuntime();
+    const reported = paymentFromIntent(intent);
+    if (runtime && reported) {
+      // Retrieved from Stripe with the server key, so the status is trusted.
+      paid = settledPaid(await recordPayment(runtime.db, reported));
+    } else if (runtime) {
+      paid = false;
+    } else if (paid && orderId) {
       recordPaidOrder(orderId, "payment_intent");
     }
     return Response.json({
@@ -60,6 +70,18 @@ export async function POST(request: Request) {
   const payment = await readPaymentRequest(request);
   if (!payment.ok) {
     return Response.json({ error: payment.error }, { status: payment.status });
+  }
+
+  const runtime = serverRuntime();
+  if (runtime) {
+    try {
+      const payable = await payableOrder(runtime.db, payment);
+      if (!payable.ok) return Response.json({ error: payable.error }, { status: payable.status });
+      const clientSecret = await cardIntentFor(runtime.db, payable.order);
+      return Response.json({ clientSecret, amount: payable.order.grandTotal });
+    } catch {
+      return Response.json({ error: "Could not start the Stripe test card form. Please try again." }, { status: 502 });
+    }
   }
 
   try {

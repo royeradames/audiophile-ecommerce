@@ -113,3 +113,98 @@ export function orderIdFromStripeEvent(event: unknown) {
 
   return null;
 }
+
+type StripeRecord = Record<string, unknown>;
+
+export type ReportedPayment = {
+  orderId: string;
+  paymentIntentId: string;
+  checkoutSessionId: string | null;
+  status: string;
+  amountCents: number;
+  currency: string;
+  livemode: boolean;
+};
+
+function text(value: unknown) {
+  return typeof value === "string" && value ? value : null;
+}
+
+function metadataOrderId(object: StripeRecord) {
+  const metadata = object.metadata;
+  return metadata && typeof metadata === "object" ? text((metadata as StripeRecord).order_id) : null;
+}
+
+/** A PaymentIntent, as an event payload or a server-side retrieval. */
+export function paymentFromIntent(object: StripeRecord): ReportedPayment | null {
+  const orderId = metadataOrderId(object);
+  const paymentIntentId = text(object.id);
+  const status = text(object.status);
+  const succeeded = status === "succeeded";
+  const amount = succeeded ? object.amount_received : object.amount;
+  if (!orderId?.startsWith("AUD-") || !paymentIntentId?.startsWith("pi_") || !status ||
+      typeof amount !== "number" || !Number.isInteger(amount) || amount <= 0) {
+    return null;
+  }
+  return {
+    orderId,
+    paymentIntentId,
+    checkoutSessionId: null,
+    status,
+    amountCents: amount,
+    currency: text(object.currency) ?? "",
+    livemode: object.livemode === true,
+  };
+}
+
+/** A completed Checkout session reports its PaymentIntent once it is paid. */
+export function paymentFromCheckoutSession(object: StripeRecord): ReportedPayment | null {
+  const orderId = text(object.client_reference_id) ?? metadataOrderId(object);
+  const sessionId = text(object.id);
+  const intent = object.payment_intent;
+  const paymentIntentId = typeof intent === "string" ? intent : text((intent as StripeRecord | null)?.id);
+  const amount = object.amount_total;
+  if (!orderId?.startsWith("AUD-") || !sessionId?.startsWith("cs_") || !paymentIntentId?.startsWith("pi_") ||
+      typeof amount !== "number" || !Number.isInteger(amount) || amount <= 0) {
+    return null;
+  }
+  const paymentStatus = text(object.payment_status);
+  return {
+    orderId,
+    paymentIntentId,
+    checkoutSessionId: sessionId,
+    status: paymentStatus === "paid" ? "succeeded" : `checkout_${paymentStatus ?? "unknown"}`,
+    amountCents: amount,
+    currency: text(object.currency) ?? "",
+    livemode: object.livemode === true,
+  };
+}
+
+const INTENT_EVENTS = new Set([
+  "payment_intent.succeeded",
+  "payment_intent.processing",
+  "payment_intent.payment_failed",
+  "payment_intent.canceled",
+]);
+
+const SESSION_EVENTS = new Set([
+  "checkout.session.completed",
+  "checkout.session.async_payment_succeeded",
+  "checkout.session.async_payment_failed",
+]);
+
+/** The payment a verified webhook event reports, or null for other events. */
+export function paymentFromStripeEvent(event: unknown): ReportedPayment | null {
+  if (!event || typeof event !== "object") return null;
+  const record = event as { type?: unknown; data?: { object?: StripeRecord } };
+  const object = record.data?.object;
+  const type = typeof record.type === "string" ? record.type : "";
+  if (!object) return null;
+  if (INTENT_EVENTS.has(type)) return paymentFromIntent(object);
+  if (SESSION_EVENTS.has(type)) {
+    const payment = paymentFromCheckoutSession(object);
+    if (payment && type === "checkout.session.async_payment_failed") payment.status = "checkout_failed";
+    return payment;
+  }
+  return null;
+}

@@ -43,3 +43,18 @@ export function sites(): Plugin {
     },
   };
 }
+
+// The Sites fallback stays guest-only: swap the server runtime (PostgreSQL and
+// the account package) for the stub that has neither.
+export function guestOnlyRuntime(): Plugin {
+  return {
+    name: "audiophile-guest-only-runtime",
+    enforce: "pre",
+    async resolveId(source, importer, options) {
+      if (!/(^|\/)server\/runtime(\.ts)?$/.test(source)) return null;
+      const resolved = await this.resolve(source, importer, { ...options, skipSelf: true });
+      if (!resolved || !resolved.id.endsWith("/app/server/runtime.ts")) return null;
+      return resolve(resolved.id, "../runtime.sites.ts");
+    },
+  };
+}

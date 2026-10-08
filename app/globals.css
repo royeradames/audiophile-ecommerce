@@ -1985,3 +1985,21 @@ legend {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Customer accounts and saved orders */
+.checkout-intro .account-note {
+  margin: 14px 0 0;
+  max-width: 62ch;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.pay-email {
+  max-width: 420px;
+  margin-top: 28px;
+}
+
+.pay-actions {
+  margin-top: 28px;
+  max-width: 560px;
+}
