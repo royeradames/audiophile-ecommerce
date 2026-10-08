@@ -234,10 +234,13 @@ try {
         } catch { return false; }
       }),
       ogUrl: document.querySelector('meta[property="og:url"]')?.getAttribute("content"),
+      ogImage: document.querySelector('meta[property="og:image"]')?.getAttribute("content"),
     }));
     if (identity.siteName !== "Audiophile") failures.push(`${route}: og:site_name is ${identity.siteName}`);
     if (!identity.website) failures.push(`${route}: no WebSite JSON-LD with the canonical name and URL`);
-    if ((identity.ogUrl || "").replace(/\/$/, "") !== "https://audiophile.royeradames.com") failures.push(`${route}: og:url is ${identity.ogUrl}`);
+    // Only the home page may name the home URL as its og:url (one shared card for every page is LND1).
+    if (route !== "/" && (identity.ogUrl || "").replace(/\/$/, "") === "https://audiophile.royeradames.com") failures.push(`${route}: og:url points at the home page`);
+    if (identity.ogImage !== "https://audiophile.royeradames.com/og.png") failures.push(`${route}: og:image is ${identity.ogImage}`);
   }
 } finally {
   await browser.close();

@@ -717,7 +717,6 @@ h3 {
      and it may still wrap inside the button when a reader enlarges text. */
   max-width: 100%;
   padding-inline: clamp(12px, 2.4vw, 27px);
-  letter-spacing: clamp(0.06em, 0.9vw, 0.12em);
 }
 
 .recommendation-grid h3 {

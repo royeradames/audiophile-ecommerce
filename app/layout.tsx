@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
-import { headers } from "next/headers";
 import "./globals.css";
 import { CartProvider } from "./cart-context";
 import { OrderProvider } from "./order-context";
@@ -14,16 +13,13 @@ const manrope = Manrope({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost";
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  const origin = `${protocol}://${host}`;
+  const shareImage = new URL("og.png", SITE_URL).href;
   const title = "Audiophile — Sound worth slowing down for";
   const description =
     "A responsive portfolio storefront experiment for considered personal and home audio.";
 
   return {
-    metadataBase: new URL(origin),
+    metadataBase: new URL(SITE_URL),
     title: { default: title, template: "%s | Audiophile" },
     description,
     icons: {
@@ -41,14 +37,13 @@ export async function generateMetadata(): Promise<Metadata> {
       title,
       description,
       type: "website",
-      url: SITE_URL,
-      images: [{ url: `${origin}/og.png`, width: 1731, height: 909, alt: "Audiophile — Sound worth slowing down for" }],
+      images: [{ url: shareImage, width: 1731, height: 909, alt: "Audiophile — Sound worth slowing down for" }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [`${origin}/og.png`],
+      images: [shareImage],
     },
   };
 }
