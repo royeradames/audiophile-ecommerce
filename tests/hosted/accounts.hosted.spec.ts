@@ -36,6 +36,23 @@ async function verificationLink(email: string) {
   return link;
 }
 
+async function sinkMessages(email: string) {
+  const response = await readSink(email);
+  if (response.status !== 200) return [];
+  return ((await response.json()) as { messages: Array<{ subject: string; text: string }> }).messages;
+}
+
+/** The six-digit code from the first preview message that was not already in the mailbox. */
+async function newBrowserCode(email: string, seen: Set<string>) {
+  let code = "";
+  await expect.poll(async () => {
+    const fresh = (await sinkMessages(email)).filter((message) => !seen.has(message.subject + message.text));
+    code = fresh.map((message) => /\b(\d{6})\b/.exec(message.text)?.[1]).find(Boolean) ?? "";
+    return Boolean(code);
+  }, { message: "Waiting for the new-browser code", timeout: 30_000 }).toBe(true);
+  return code;
+}
+
 async function createCentralAccount(page: Page, account: Person) {
   await page.goto(accountsOrigin + "/create-account");
   await page.getByLabel("Name", { exact: true }).fill(account.name);
@@ -62,7 +79,15 @@ async function signIn(page: Page, account: Person) {
   await expect(page).toHaveURL((url) => url.origin === accountsOrigin && url.pathname === "/login");
   await page.getByLabel("Username or email").fill(account.username);
   await page.locator("input").and(page.getByLabel("Password", { exact: true })).fill(account.password);
+  const seen = new Set((await sinkMessages(account.email)).map((message) => message.subject + message.text));
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.waitForURL((url) => url.href === shopOrigin + "/account" || (url.origin === accountsOrigin && url.pathname === "/verify-device"), { timeout: 20_000 });
+  if (new URL(page.url()).pathname === "/verify-device") {
+    // royer-auth #23 (rc.5 issuer): a browser the account has not used confirms itself with an emailed code.
+    await expect(page.getByRole("heading", { name: "Confirm this browser" })).toBeVisible();
+    await page.getByLabel("Email code", { exact: true }).fill(await newBrowserCode(account.email, seen));
+    await page.getByRole("button", { name: "Confirm and sign in", exact: true }).click();
+  }
   await expect(page).toHaveURL(shopOrigin + "/account");
   await expect(page.getByText(`Signed in as ${account.name} (${account.email})`)).toBeVisible();
 }
