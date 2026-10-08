@@ -36,6 +36,7 @@ export async function generateMetadata(): Promise<Metadata> {
       apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
     },
     openGraph: {
+      siteName: "Audiophile",
       title,
       description,
       type: "website",
@@ -59,6 +60,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={manrope.variable}>
+        <script
+          type="application/ld+json"
+          // Static, app-owned data: one site name everywhere (og:site_name, logo, JSON-LD).
+          dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@type": "WebSite", name: "Audiophile" }) }}
+        />
         <CartProvider>
           <PayeeProvider>
             <OrderProvider>
