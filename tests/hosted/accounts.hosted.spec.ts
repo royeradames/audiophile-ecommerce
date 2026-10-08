@@ -81,7 +81,11 @@ async function signIn(page: Page, account: Person) {
   await page.locator("input").and(page.getByLabel("Password", { exact: true })).fill(account.password);
   const seen = new Set((await sinkMessages(account.email)).map((message) => message.subject + message.text));
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.waitForURL((url) => url.href === shopOrigin + "/account" || (url.origin === accountsOrigin && url.pathname === "/verify-device"), { timeout: 20_000 });
+  // Poll rather than waitForURL: the sign-in redirect chain can abort one navigation with the next.
+  await expect.poll(() => {
+    const url = new URL(page.url());
+    return url.href === shopOrigin + "/account" || (url.origin === accountsOrigin && url.pathname === "/verify-device");
+  }, { message: "Waiting to return to Audiophile or to confirm this browser", timeout: 20_000 }).toBe(true);
   if (new URL(page.url()).pathname === "/verify-device") {
     // royer-auth #23 (rc.5 issuer): a browser the account has not used confirms itself with an emailed code.
     await expect(page.getByRole("heading", { name: "Confirm this browser" })).toBeVisible();

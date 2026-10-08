@@ -2,6 +2,14 @@
 
 import Link from "next/link";
 import { BestGear, CategoryLinks } from "./shared-sections";
+import { pageMetadata } from "./site-identity";
+
+export const metadata = pageMetadata({
+  path: "/",
+  title: "Audiophile — Sound worth slowing down for",
+  description: "A responsive portfolio storefront experiment for considered personal and home audio.",
+  absoluteTitle: true,
+});
 
 export default function HomePage() {
   return (

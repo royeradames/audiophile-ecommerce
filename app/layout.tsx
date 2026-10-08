@@ -4,7 +4,7 @@ import "./globals.css";
 import { CartProvider } from "./cart-context";
 import { OrderProvider } from "./order-context";
 import { PayeeProvider } from "./payee-context";
-import { SITE_NAME, SITE_URL } from "./site-identity";
+import { SHARE_IMAGE, SITE_NAME, SITE_URL } from "./site-identity";
 import { SiteShell } from "./site-shell";
 
 const manrope = Manrope({
@@ -13,7 +13,7 @@ const manrope = Manrope({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const shareImage = new URL("og.png", SITE_URL).href;
+  const shareImage = SHARE_IMAGE;
   const title = "Audiophile — Sound worth slowing down for";
   const description =
     "A responsive portfolio storefront experiment for considered personal and home audio.";

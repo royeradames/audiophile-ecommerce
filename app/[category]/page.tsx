@@ -4,12 +4,19 @@ import { notFound } from "next/navigation";
 import { categories, getCategoryProducts } from "../catalog";
 import { ResponsiveImage } from "../responsive-image";
 import { BestGear, CategoryLinks } from "../shared-sections";
+import { pageMetadata } from "../site-identity";
 
 type CategoryPageProps = { params: Promise<{ category: string }> };
 
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
   const { category } = await params;
-  return { title: category.charAt(0).toUpperCase() + category.slice(1) };
+  if (!categories.includes(category as (typeof categories)[number])) return {};
+  const label = category.charAt(0).toUpperCase() + category.slice(1);
+  return pageMetadata({
+    path: `/${category}`,
+    title: label,
+    description: `${label} in the Audiophile demo store: compare each model, its features and what comes in the box. Nothing is sold or shipped.`,
+  });
 }
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
