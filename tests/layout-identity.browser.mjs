@@ -17,7 +17,7 @@ const routes = [
   "/speakers/zx9-speaker", "/speakers/zx7-speaker", "/earphones/yx1-earphones",
   "/payments", "/zelle", "/checkout", "/orders", "/account",
 ];
-const widths = [320, 330, 350, 400, 630, 650, 670, 770, 910, 920, 960, 1000, 1280, 1920];
+const widths = [320, 330, 350, 400, 620, 621, 630, 650, 670, 770, 900, 901, 910, 920, 960, 1000, 1110, 1280, 1920];
 const failures = [];
 
 const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || "chrome", headless: true });
@@ -54,12 +54,41 @@ try {
           // Visually hidden headings (1px clip) exist for screen readers only.
           if (!visible(el) || el.clientWidth <= 2) continue;
           if (el.scrollWidth > el.clientWidth + 1) out.push(`heading spills "${el.textContent.trim().slice(0, 30)}" (${el.scrollWidth} > ${el.clientWidth})`);
-          const text = el.textContent.trim();
-          if (text.split(/\s+/).length < 2) continue;
+          // A word split across lines, or more lines than words, is a squeeze.
+          const words = [];
+          const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+          while (walker.nextNode()) {
+            const node = walker.currentNode;
+            for (const match of node.textContent.matchAll(/\S+/g)) {
+              const range = document.createRange();
+              range.setStart(node, match.index);
+              range.setEnd(node, match.index + match[0].length);
+              const tops = new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top)));
+              words.push(match[0]);
+              if (tops.size > 1) out.push(`heading breaks a word "${match[0]}" in "${el.textContent.trim().slice(0, 30)}"`);
+            }
+          }
           const range = document.createRange();
           range.selectNodeContents(el);
           const lines = new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size;
-          if (lines > 1 && text.length / lines < 8) out.push(`heading squeezed "${text.slice(0, 30)}" (${(text.length / lines).toFixed(1)} chars per line)`);
+          if (lines > words.length) out.push(`heading squeezed "${el.textContent.trim().slice(0, 30)}" (${lines} lines for ${words.length} words)`);
+        }
+        // The header: wordmark, nav and cart never touch, and the desktop nav is one line.
+        const parts = [".wordmark", "#primary-navigation", ".cart-button", ".menu-button"]
+          .map((selector) => document.querySelector(`header ${selector}`))
+          .filter((el) => el && visible(el));
+        for (let a = 0; a < parts.length; a += 1) {
+          for (let b = a + 1; b < parts.length; b += 1) {
+            const one = parts[a].getBoundingClientRect(), two = parts[b].getBoundingClientRect();
+            if (one.left < two.right - 1 && two.left < one.right - 1 && one.top < two.bottom - 1 && two.top < one.bottom - 1) {
+              out.push(`header crowded: ${parts[a].className || parts[a].id} meets ${parts[b].className || parts[b].id}`);
+            }
+          }
+        }
+        const nav = document.querySelector("#primary-navigation");
+        if (innerWidth > 900 && nav && visible(nav)) {
+          const tops = new Set([...nav.querySelectorAll("a")].map((a) => Math.round(a.getBoundingClientRect().top)));
+          if (tops.size > 1) out.push(`desktop nav wraps to ${tops.size} lines`);
         }
         return out;
       });
@@ -67,21 +96,49 @@ try {
     }
   }
 
-  // Journey: browse a category from the menu on a phone, with nothing covered.
-  await page.setViewportSize({ width: 400, height: 800 });
-  await page.goto(base + "/");
-  await page.getByRole("button", { name: "Menu" }).click();
-  const overlap = await page.evaluate(() => {
-    const nav = document.querySelector("#primary-navigation").getBoundingClientRect();
-    const covered = [...document.querySelectorAll("main h1, main p, .demo-banner")].filter((el) => {
-      const box = el.getBoundingClientRect();
-      return box.height > 0 && box.top < nav.bottom - 2 && box.bottom > nav.top + 2;
+  // Journey: browse a category from the menu on a phone and a tablet, with
+  // nothing covered and the bar keeping its height.
+  for (const width of [320, 400, 768]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto(base + "/");
+    const menu = page.getByRole("button", { name: "Menu" });
+    const barBefore = await page.evaluate(() => document.querySelector(".wordmark").getBoundingClientRect().top);
+    await menu.click();
+    if (await page.locator(".menu-button").getAttribute("aria-expanded") !== "true") failures.push(`menu @${width}: aria-expanded is not true`);
+    const state = await page.evaluate(() => {
+      const nav = document.querySelector("#primary-navigation").getBoundingClientRect();
+      const covered = [...document.querySelectorAll("main h1, main p, .demo-banner")].filter((el) => {
+        const box = el.getBoundingClientRect();
+        return box.height > 0 && box.top < nav.bottom - 2 && box.bottom > nav.top + 2;
+      });
+      return { covered: covered.map((el) => el.textContent.trim().slice(0, 30)), bar: document.querySelector(".wordmark").getBoundingClientRect().top };
     });
-    return covered.map((el) => el.textContent.trim().slice(0, 30));
+    if (state.covered.length) failures.push(`menu @${width} covers page text: ${state.covered.join(" | ")}`);
+    if (Math.abs(state.bar - barBefore) > 1) failures.push(`menu @${width}: header bar moved ${state.bar - barBefore}px`);
+    await page.getByRole("button", { name: "Close" }).click();
+    if (await page.locator("#primary-navigation").isVisible()) failures.push(`menu @${width}: Close left the menu open`);
+    await menu.click();
+    await page.locator("#primary-navigation").getByRole("link", { name: "Speakers" }).click();
+    await page.waitForURL(base + "/speakers");
+  }
+
+  // The cart dialog on the narrowest phone: heading and Close side by side, no overlap.
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto(base + "/");
+  await page.locator(".cart-button").click();
+  const cart = await page.evaluate(() => {
+    const out = [];
+    const panel = document.querySelector(".cart-panel");
+    if (panel.scrollWidth > panel.clientWidth + 1) out.push("cart panel spills");
+    const [title, close] = [panel.querySelector(".cart-heading > div"), panel.querySelector(".cart-heading button")].map((el) => el.getBoundingClientRect());
+    if (title.left < close.right - 1 && close.left < title.right - 1 && title.top < close.bottom - 1 && close.top < title.bottom - 1) out.push("cart heading meets Close");
+    for (const el of panel.querySelectorAll("*")) {
+      const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+      if (own && parseFloat(getComputedStyle(el).fontSize) < 15.5) out.push(`cart text under 16 px: ${el.textContent.trim().slice(0, 20)}`);
+    }
+    return out;
   });
-  if (overlap.length) failures.push(`menu covers page text: ${overlap.join(" | ")}`);
-  await page.locator("#primary-navigation").getByRole("link", { name: "Speakers" }).click();
-  await page.waitForURL(base + "/speakers");
+  failures.push(...cart.map((problem) => `cart dialog @320: ${problem}`));
 
   // Site identity on every route.
   for (const route of routes) {

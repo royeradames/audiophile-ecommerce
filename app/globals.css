@@ -298,6 +298,7 @@ h3 {
   background: var(--accent);
   color: #fff;
   font-size: 1rem; /* 16 px floor */
+  line-height: 1;
 }
 
 .menu-button {
@@ -427,9 +428,11 @@ h3 {
 }
 
 .feature-zx9 h3 {
+  /* "ZX9 / SPEAKER" on two lines, as in the design, never wider than a word. */
+  max-width: min-content;
   margin-bottom: 24px;
-  font-size: clamp(2.25rem, 4.5vw, 4rem);
-  overflow-wrap: anywhere;
+  font-size: clamp(2.25rem, 4.5vw, 3.5rem);
+  overflow-wrap: break-word;
   text-transform: uppercase;
 }
 
@@ -588,13 +591,9 @@ h3 {
 .product-summary h1,
 .product-summary h2 {
   margin-bottom: 28px;
-  text-transform: uppercase;
-}
-
-.product-summary h1,
-.product-summary h2 {
   font-size: clamp(1.75rem, 3.2vw, 2.5rem);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  text-transform: uppercase;
 }
 
 .product-detail {
@@ -1624,6 +1623,8 @@ legend {
 @media (max-width: 900px) {
   .header-inner {
     grid-template-columns: 1fr auto 1fr;
+    /* The bar keeps its height when the open menu adds a second row. */
+    grid-template-rows: 92px;
   }
 
   .menu-button {
@@ -1672,6 +1673,10 @@ legend {
     padding: 58px 12%;
     background-position: center -250px;
     text-align: center;
+  }
+
+  .feature-zx9 h3 {
+    font-size: clamp(2.25rem, 7vw, 3.5rem);
   }
 
   .feature-zx9 img {
@@ -1776,6 +1781,7 @@ legend {
 
   .header-inner {
     min-height: 80px;
+    grid-template-rows: 80px;
   }
 
   .checkout-page {

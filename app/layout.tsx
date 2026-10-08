@@ -7,6 +7,8 @@ import { OrderProvider } from "./order-context";
 import { PayeeProvider } from "./payee-context";
 import { SiteShell } from "./site-shell";
 
+const SITE_NAME = "Audiophile";
+
 const manrope = Manrope({
   variable: "--font-manrope",
   subsets: ["latin"],
@@ -36,7 +38,7 @@ export async function generateMetadata(): Promise<Metadata> {
       apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
     },
     openGraph: {
-      siteName: "Audiophile",
+      siteName: SITE_NAME,
       title,
       description,
       type: "website",
@@ -52,18 +54,22 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost";
+  const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const website = { "@context": "https://schema.org", "@type": "WebSite", name: SITE_NAME, url: `${protocol}://${host}/` };
   return (
     <html lang="en">
       <body className={manrope.variable}>
         <script
           type="application/ld+json"
-          // Static, app-owned data: one site name everywhere (og:site_name, logo, JSON-LD).
-          dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@type": "WebSite", name: "Audiophile" }) }}
+          // App-owned data: one site name everywhere (og:site_name, logo, JSON-LD).
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(website).replace(/</g, "\\u003c") }}
         />
         <CartProvider>
           <PayeeProvider>
