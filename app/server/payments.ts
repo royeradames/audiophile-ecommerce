@@ -8,7 +8,7 @@ import {
   retrieveStripeCheckoutSession,
   retrieveStripePaymentIntent,
 } from "../stripe-api";
-import { paymentFromCheckoutSession, paymentFromIntent, type ReportedPayment } from "../stripe-webhook";
+import { intentStatus, paymentFromCheckoutSession, paymentFromIntent, type ReportedPayment } from "../stripe-webhook";
 import {
   checkoutSessionsFor,
   countAttempts,
@@ -84,12 +84,12 @@ export async function cardIntentFor(db: pg.Pool, order: StoredOrder): Promise<{ 
     const intent = await retrieveStripePaymentIntent(attempt.payment_intent_id);
     const reported = paymentFromIntent(intent);
     if (reported && reported.orderId === order.id) await recordPayment(db, reported);
-    const status = String(intent.status);
+    const status = intentStatus(intent.status);
     if (status === "succeeded") return alreadyPaid(order);
     if (status === "processing") {
       return { ok: false, status: 409, error: `A payment for order ${order.id} is still processing. Check the order page in a moment.` };
     }
-    if (!reusable && intent.livemode !== true && reusableStatuses.has(status) &&
+    if (!reusable && intent.livemode !== true && status && reusableStatuses.has(status) &&
         intent.amount === order.totalCents && typeof intent.client_secret === "string") {
       reusable = intent.client_secret;
     }
@@ -110,7 +110,7 @@ export async function cardIntentFor(db: pg.Pool, order: StoredOrder): Promise<{ 
     orderId: order.id,
     paymentIntentId: intent.id,
     checkoutSessionId: null,
-    status: String(intent.status),
+    status: intentStatus(intent.status) ?? "unknown",
     amountCents: order.totalCents,
     currency: "usd",
     livemode: false,
@@ -128,7 +128,8 @@ export async function hostedCheckoutFor(
   order: StoredOrder,
   input: { origin: string; description: string },
 ): Promise<{ ok: true; url: string } | Refusal> {
-  for (const sessionId of await checkoutSessionsFor(db, order.id)) {
+  const earlier = await checkoutSessionsFor(db, order.id);
+  for (const sessionId of earlier) {
     const session = await retrieveStripeCheckoutSession(sessionId);
     const reported = paymentFromCheckoutSession(session);
     if (reported && reported.orderId === order.id) await recordPayment(db, reported);
@@ -144,6 +145,8 @@ export async function hostedCheckoutFor(
     email: order.email,
     origin: input.origin,
     description: input.description,
+    // Simultaneous requests (two tabs, a double click) get the same page.
+    idempotencyKey: `audiophile:${order.id}:session:${earlier.length}`,
   });
   if (typeof session.id !== "string" || typeof session.url !== "string" || session.livemode === true) {
     throw new Error("Stripe did not return a test Checkout session.");

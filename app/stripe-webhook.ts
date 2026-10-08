@@ -135,11 +135,24 @@ function metadataOrderId(object: StripeRecord) {
   return metadata && typeof metadata === "object" ? text((metadata as StripeRecord).order_id) : null;
 }
 
+// This Stripe account answers with an older API version, which still names
+// two PaymentIntent statuses by their pre-2019 names.
+const LEGACY_INTENT_STATUSES: Record<string, string> = {
+  requires_source: "requires_payment_method",
+  requires_source_action: "requires_action",
+};
+
+/** A PaymentIntent status in current API terms. */
+export function intentStatus(value: unknown) {
+  const status = text(value);
+  return status ? LEGACY_INTENT_STATUSES[status] ?? status : null;
+}
+
 /** A PaymentIntent, as an event payload or a server-side retrieval. */
 export function paymentFromIntent(object: StripeRecord): ReportedPayment | null {
   const orderId = metadataOrderId(object);
   const paymentIntentId = text(object.id);
-  const status = text(object.status);
+  const status = intentStatus(object.status);
   const succeeded = status === "succeeded";
   const amount = succeeded ? object.amount_received : object.amount;
   if (!orderId?.startsWith("AUD-") || !paymentIntentId?.startsWith("pi_") || !status ||

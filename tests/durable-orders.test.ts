@@ -115,7 +115,8 @@ test("a cancelled card form and a retry reuse one order and one open PaymentInte
       assert.equal((init.body as URLSearchParams).get("amount"), String(XX99_TOTAL_CENTS));
     }
     return Response.json({
-      id: "pi_synthetic_retry", object: "payment_intent", status: "requires_payment_method", livemode: false,
+      // The account's API version still says requires_source for requires_payment_method.
+      id: "pi_synthetic_retry", object: "payment_intent", status: "requires_source", livemode: false,
       amount: XX99_TOTAL_CENTS, currency: "usd", client_secret: "pi_synthetic_retry_secret_x", metadata: { order_id: orderId },
     });
   });
@@ -195,12 +196,18 @@ test("a new hosted Checkout page closes the earlier one, and a paid page settles
   const orderId = body.order.id;
   const sessions = new Map<string, { status: string; payment_status: string }>();
   const calls: string[] = [];
+  const byKey = new Map<string, string>();
   t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
     const path = new URL(url).pathname;
     calls.push(`${init.method} ${path}`);
     if (path === "/v1/checkout/sessions") {
-      const id = `cs_test_synthetic_${sessions.size + 1}`;
-      sessions.set(id, { status: "open", payment_status: "unpaid" });
+      // Like Stripe, a repeated idempotency key returns the first session.
+      const key = (init.headers as Record<string, string>)["idempotency-key"];
+      const id = byKey.get(key) ?? `cs_test_synthetic_${sessions.size + 1}`;
+      if (!byKey.has(key)) {
+        byKey.set(key, id);
+        sessions.set(id, { status: "open", payment_status: "unpaid" });
+      }
       return Response.json({ id, url: `https://checkout.stripe.com/${id}`, livemode: false });
     }
     const id = path.split("/")[4];
@@ -213,7 +220,11 @@ test("a new hosted Checkout page closes the earlier one, and a paid page settles
   });
   const start = () => checkoutRoute.POST(json("http://localhost/api/stripe/checkout", { orderId, email: customer.email, items: cart }));
 
-  assert.equal((await start()).status, 200);
+  // Two tabs (or a double click) at once get one page.
+  const [first, twin] = await Promise.all([start(), start()]);
+  assert.equal(first.status, 200);
+  assert.equal((await first.json()).url, (await twin.json()).url);
+  assert.equal(sessions.size, 1);
   assert.equal((await start()).status, 200, "Retrying after a cancel opens a new page");
   assert.equal(sessions.get("cs_test_synthetic_1")?.status, "expired", "The earlier page can no longer take payment");
 
@@ -223,7 +234,7 @@ test("a new hosted Checkout page closes the earlier one, and a paid page settles
   assert.equal(third.status, 409);
   const { rows } = await database.query(`select "status" from "audiophile_orders" where "id" = $1`, [orderId]);
   assert.equal(rows[0].status, "paid");
-  assert.equal(calls.filter((call) => call === "POST /v1/checkout/sessions").length, 2);
+  assert.equal(sessions.size, 2);
 
   const wrongMethod = await intentRoute.POST(json("http://localhost/api/stripe/payment-intent", { orderId, email: customer.email, items: cart }));
   assert.equal(wrongMethod.status, 409, "A hosted-card order cannot also open the card form");

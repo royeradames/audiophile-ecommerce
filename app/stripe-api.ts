@@ -34,6 +34,8 @@ export async function createStripeCheckoutSession(input: {
   email: string;
   origin: string;
   description: string;
+  /** Stripe returns the same session for a repeated key instead of creating another. */
+  idempotencyKey?: string;
 }) {
   const params = new URLSearchParams();
   params.set("mode", "payment");
@@ -52,7 +54,10 @@ export async function createStripeCheckoutSession(input: {
 
   return stripeRequest("checkout/sessions", {
     method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      ...(input.idempotencyKey ? { "idempotency-key": input.idempotencyKey } : {}),
+    },
     body: params,
   });
 }

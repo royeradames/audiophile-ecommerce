@@ -2,7 +2,7 @@ import { createStripePaymentIntent, retrieveStripePaymentIntent } from "../../..
 import { recordPaidOrder } from "../../../paid-ledger";
 import { stripePublicConfig } from "../../../stripe-env";
 import { readPaymentRequest } from "../../../payment-request";
-import { paymentFromIntent } from "../../../stripe-webhook";
+import { intentStatus, paymentFromIntent } from "../../../stripe-webhook";
 import { cardIntentFor, payableOrder, recordPayment, settledPaid } from "../../../server/payments";
 import { serverRuntime } from "../../../server/runtime";
 
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     if (intent.livemode === true) {
       return Response.json({ error: "Live Stripe objects are blocked." }, { status: 400 });
     }
-    const status = typeof intent.status === "string" ? intent.status : "";
+    const status = intentStatus(intent.status) ?? "";
     const metadata = intent.metadata && typeof intent.metadata === "object" ? intent.metadata : null;
     const orderId =
       metadata && "order_id" in metadata && typeof metadata.order_id === "string"
