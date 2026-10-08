@@ -7,16 +7,22 @@ const featuresSchema = z.object({
   durableOrders: z.boolean(),
   accounts: z.enum(["enabled", "coming_soon"]),
 });
-const guestOnly: StoreFeatures = { durableOrders: false, accounts: "coming_soon" };
 let features: Promise<StoreFeatures> | null = null;
 
-/** What this deployment offers; the guest-only fallback answers 404. */
+/**
+ * What this deployment offers (the guest-only fallback answers too). A failed
+ * check throws instead of guessing, so an order is never quietly kept in the
+ * browser on a store that saves orders.
+ */
 export function fetchStoreFeatures() {
   features ??= fetch("/api/store/features", { cache: "no-store" })
-    .then(async (response) => (response.ok ? featuresSchema.parse(await response.json()) : guestOnly))
-    .catch(() => {
+    .then(async (response) => {
+      if (!response.ok) throw new Error("The store could not be reached.");
+      return featuresSchema.parse(await response.json());
+    })
+    .catch((error: unknown) => {
       features = null;
-      return guestOnly;
+      throw error;
     });
   return features;
 }

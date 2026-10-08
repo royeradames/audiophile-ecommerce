@@ -25,9 +25,13 @@ export default function AccountPage() {
   const [message, setMessage] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
-  const load = useCallback(async () => {
-    const features = await fetchStoreFeatures();
-    if (features.accounts !== "enabled") return { state: "coming_soon" } as const;
+  const load = useCallback(async (): Promise<View> => {
+    try {
+      const features = await fetchStoreFeatures();
+      if (features.accounts !== "enabled") return { state: "coming_soon" };
+    } catch {
+      return { state: "error", error: "The store could not be reached. Try again in a moment." };
+    }
     return fetchAccountOrders();
   }, []);
 

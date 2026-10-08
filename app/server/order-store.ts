@@ -197,16 +197,42 @@ export async function createOrder(pool: pg.Pool, input: NewOrder, customerId: st
   });
 }
 
-// Statuses in which Stripe still accepts a payment method for the intent.
-const reusableIntentStatuses = ["requires_payment_method", "requires_confirmation", "requires_action"];
-
-export async function latestReusableAttempt(db: Transaction, orderId: string) {
+/**
+ * Card attempts whose outcome Stripe may have changed since we last heard:
+ * anything not already known to be finished. Newest first.
+ */
+export async function openAttempts(db: Transaction, orderId: string) {
   const { rows } = await db.query<{ payment_intent_id: string; amount_cents: number }>(
     `select "payment_intent_id", "amount_cents" from "audiophile_payments"
-      where "order_id" = $1 and "status" = any($2::text[]) order by "created_at" desc limit 1`,
-    [orderId, reusableIntentStatuses],
+      where "order_id" = $1 and "status" not in ('succeeded', 'canceled') and "checkout_session_id" is null
+      order by "created_at" desc limit 10`,
+    [orderId],
   );
-  return rows[0] ?? null;
+  return rows;
+}
+
+export async function checkoutSessionsFor(db: Transaction, orderId: string) {
+  const { rows } = await db.query<{ session_id: string }>(
+    `select "session_id" from "audiophile_checkout_sessions" where "order_id" = $1 order by "created_at" desc limit 10`,
+    [orderId],
+  );
+  return rows.map((row) => row.session_id);
+}
+
+export async function recordCheckoutSession(db: Transaction, orderId: string, sessionId: string) {
+  await db.query(
+    `insert into "audiophile_checkout_sessions" ("session_id", "order_id") values ($1, $2) on conflict do nothing`,
+    [sessionId, orderId],
+  );
+}
+
+/** Orders that more than one payment succeeded for: staff must refund the extra. */
+export async function listDoublePaidOrders(db: Transaction) {
+  const { rows } = await db.query<{ order_id: string; payments: number }>(
+    `select "order_id", count(*)::int as "payments" from "audiophile_payments"
+      where "status" = 'succeeded' group by "order_id" having count(*) > 1 order by "order_id" limit 200`,
+  );
+  return rows.map((row) => ({ orderId: row.order_id, payments: row.payments }));
 }
 
 export async function countAttempts(db: Transaction, orderId: string) {
@@ -240,6 +266,7 @@ export async function settleStripePayment(tx: Transaction, payment: StripePaymen
     `select "status", "total_cents" from "audiophile_orders" where "id" = $1 for update`, [payment.orderId]);
   const order = rows[0];
   if (!order) return "unknown_order";
+  if (payment.currency !== "usd") return "amount_mismatch";
 
   const recorded = await tx.query(
     `insert into "audiophile_payments" ("payment_intent_id", "order_id", "checkout_session_id", "status", "amount_cents", "currency")
@@ -253,8 +280,11 @@ export async function settleStripePayment(tx: Transaction, payment: StripePaymen
   );
   if (recorded.rowCount === 0) return "foreign_intent";
   if (payment.status !== "succeeded") return "recorded";
-  if (payment.currency !== "usd" || payment.amountCents !== order.total_cents) return "amount_mismatch";
-  if (order.status === "paid") return "already_paid";
+  if (payment.amountCents !== order.total_cents) return "amount_mismatch";
+  if (order.status === "paid") {
+    console.error(JSON.stringify({ event: "payment_after_settlement", orderId: payment.orderId }));
+    return "already_paid";
+  }
   if (order.status !== "pending_hosted") return "not_payable";
   await tx.query(
     `update "audiophile_orders" set "status" = 'paid', "settled_at" = now(), "updated_at" = now()

@@ -99,6 +99,8 @@ type Confirmation = {
   pickupCity: PickupCity | "";
   email: string;
   paid: boolean;
+  /** Stripe accepted a payment the store has not confirmed yet. */
+  confirming: boolean;
   /** Stored on the server, so its status link works in any browser. */
   durable: boolean;
   savedToAccount: boolean;
@@ -232,7 +234,13 @@ export default function CheckoutPage() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const available = await fetchStoreFeatures();
+      let available: StoreFeatures;
+      try {
+        available = await fetchStoreFeatures();
+      } catch {
+        if (!cancelled) setAccount({ state: "unavailable" });
+        return;
+      }
       if (cancelled) return;
       setFeatures(available);
       if (available.accounts !== "enabled") {
@@ -283,7 +291,13 @@ export default function CheckoutPage() {
       };
       const pickupCity: PickupCity | "" = value.payment === "in_person" ? value.pickupCity : "";
       const cart = detailedItems.map((line) => ({ productId: line.product.productId, quantity: line.quantity }));
-      const available = features ?? await fetchStoreFeatures();
+      let available: StoreFeatures;
+      try {
+        available = features ?? await fetchStoreFeatures();
+      } catch {
+        setCheckoutError("The store could not be reached. Nothing was placed or charged; try again.");
+        return;
+      }
 
       let order: OrderRecord;
       let savedToAccount = false;
@@ -354,6 +368,7 @@ export default function CheckoutPage() {
         pickupCity: order.pickupCity,
         email: order.customer.email,
         paid: false,
+        confirming: false,
         durable: available.durableOrders,
         savedToAccount,
       });
@@ -419,6 +434,11 @@ export default function CheckoutPage() {
                 a dedicated AZUL terminal in the Dominican Republic. Payee
                 details come from the <Link href="/payments">payment stack</Link>.
               </p>
+              {features?.durableOrders ? (
+                <p className="account-note">
+                  Use fictional details: this demo store saves orders on its server so their links work in any browser.
+                </p>
+              ) : null}
               <AccountNotice account={account} />
               {canceled ? (
                 <CanceledCheckoutNotice order={returnedOrder} />
@@ -584,7 +604,13 @@ export default function CheckoutPage() {
             <h2 id="confirmation-title" ref={headingRef} tabIndex={-1}>
               Order {confirmation.orderId}
             </h2>
-            <p>{confirmation.paid ? "Stripe test payment recorded. This is not a live merchant charge." : confirmationCopy(confirmation.payment)}</p>
+            <p>
+              {confirmation.paid
+                ? "Stripe test payment recorded. This is not a live merchant charge."
+                : confirmation.confirming
+                  ? "Stripe accepted the test payment. The store is still confirming it; check the order status in a moment."
+                  : confirmationCopy(confirmation.payment)}
+            </p>
             {confirmation.savedToAccount ? (
               <p>Saved to your account. Find it under Account in any browser.</p>
             ) : confirmation.durable ? (
@@ -603,14 +629,14 @@ export default function CheckoutPage() {
               payee={settings}
               showPageLink={confirmation.payment !== "zelle"}
             />
-            {confirmation.payment === "element" && !confirmation.paid ? (
+            {confirmation.payment === "element" && !confirmation.paid && !confirmation.confirming ? (
               <CardPayment
                 orderId={confirmation.orderId}
                 items={confirmation.items}
                 email={confirmation.email}
-                onPaid={() => {
-                  markPaid(confirmation.orderId);
-                  setConfirmation({ ...confirmation, paid: true });
+                onPaid={(recorded) => {
+                  if (recorded) markPaid(confirmation.orderId);
+                  setConfirmation({ ...confirmation, paid: recorded, confirming: !recorded });
                 }}
               />
             ) : null}

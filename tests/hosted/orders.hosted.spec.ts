@@ -55,17 +55,18 @@ test("a guest order is saved before payment, paid once with a Stripe test card, 
     expect(retryId).toBe(intentId);
   });
 
-  await test.step("the test card pays it, and the store records it once", async () => {
+  await test.step("the test card pays it; a retry records it instead of charging again", async () => {
     await payWithTestCard(intentId);
+    // Neither the return page nor a webhook has told the store yet.
+    const again = await page.request.post(shopOrigin + "/api/stripe/payment-intent", {
+      data: { orderId: order.id, email: buyer.email, items: [{ productId: "xx99-mark-two-headphones", quantity: 1 }] },
+    });
+    expect(again.status(), "A paid order cannot start another charge").toBe(409);
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const confirmed = await page.request.get(`${shopOrigin}/api/stripe/payment-intent?id=${intentId}`);
       expect(confirmed.status()).toBe(200);
       expect((await confirmed.json()).paid).toBe(true);
     }
-    const again = await page.request.post(shopOrigin + "/api/stripe/payment-intent", {
-      data: { orderId: order.id, email: buyer.email, items: [{ productId: "xx99-mark-two-headphones", quantity: 1 }] },
-    });
-    expect(again.status(), "A paid order cannot start another charge").toBe(409);
   });
 
   await test.step("another browser reads the paid order from its link after a reload", async () => {

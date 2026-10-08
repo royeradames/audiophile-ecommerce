@@ -21,6 +21,7 @@ export default function OrdersPage() {
   const [access, setAccess] = useState<StaffAccess | null>(null);
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [refundsNeeded, setRefundsNeeded] = useState<Array<{ orderId: string; payments: number }>>([]);
   const pending = orders.filter((order) => isPending(order.status));
   const settled = orders.filter((order) => !isPending(order.status));
 
@@ -43,11 +44,12 @@ export default function OrdersPage() {
       return;
     }
     let cancelled = false;
-    void fetchPaidOrderIds().then((ids) => {
+    void fetchPaidOrderIds().then(({ paid, refundsNeeded: refunds }) => {
       if (cancelled) {
         return;
       }
-      ids.forEach((id) => markPaid(id));
+      paid.forEach((id) => markPaid(id));
+      setRefundsNeeded(refunds);
     });
     return () => {
       cancelled = true;
@@ -146,6 +148,17 @@ export default function OrdersPage() {
             </Link>
           </div>
         </div>
+
+        {refundsNeeded.length ? (
+          <div className="order-empty refund-notice" role="alert">
+            <h2>Refund needed</h2>
+            <p>
+              More than one Stripe test payment succeeded for{" "}
+              {refundsNeeded.map((entry) => `${entry.orderId} (${entry.payments} payments)`).join(", ")}.
+              Refund the extra payment in the Stripe dashboard.
+            </p>
+          </div>
+        ) : null}
 
         {orders.length === 0 ? (
           <div className="order-empty">

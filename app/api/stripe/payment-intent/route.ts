@@ -75,10 +75,11 @@ export async function POST(request: Request) {
   const runtime = serverRuntime();
   if (runtime) {
     try {
-      const payable = await payableOrder(runtime.db, payment);
+      const payable = await payableOrder(runtime.db, payment, "element");
       if (!payable.ok) return Response.json({ error: payable.error }, { status: payable.status });
-      const clientSecret = await cardIntentFor(runtime.db, payable.order);
-      return Response.json({ clientSecret, amount: payable.order.grandTotal });
+      const intent = await cardIntentFor(runtime.db, payable.order);
+      if (!intent.ok) return Response.json({ error: intent.error }, { status: intent.status });
+      return Response.json({ clientSecret: intent.clientSecret, amount: payable.order.grandTotal });
     } catch {
       return Response.json({ error: "Could not start the Stripe test card form. Please try again." }, { status: 502 });
     }

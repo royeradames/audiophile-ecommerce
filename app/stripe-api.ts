@@ -93,3 +93,8 @@ export async function createStripePaymentIntent(input: {
     body: params,
   });
 }
+
+/** Closes an open hosted Checkout page so it can no longer take payment. */
+export async function expireStripeCheckoutSession(sessionId: string) {
+  return stripeRequest(`checkout/sessions/${encodeURIComponent(sessionId)}/expire`, { method: "POST" });
+}

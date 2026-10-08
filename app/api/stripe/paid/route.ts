@@ -1,6 +1,6 @@
 import { listPaidOrders as listRememberedPaidOrders } from "../../../paid-ledger";
 import { requestHostname } from "../../../request-origin";
-import { listPaidOrders } from "../../../server/order-store";
+import { listDoublePaidOrders, listPaidOrders } from "../../../server/order-store";
 import { serverRuntime } from "../../../server/runtime";
 import { staffAccessFromHost, staffCookieIsValid } from "../../../staff-session";
 
@@ -17,7 +17,8 @@ export async function GET(request: Request) {
     return Response.json({ orders: listRememberedPaidOrders() });
   }
   try {
-    return Response.json({ orders: await listPaidOrders(runtime.db) }, { headers: { "cache-control": "private, no-store" } });
+    const [orders, refundsNeeded] = await Promise.all([listPaidOrders(runtime.db), listDoublePaidOrders(runtime.db)]);
+    return Response.json({ orders, refundsNeeded }, { headers: { "cache-control": "private, no-store" } });
   } catch {
     return Response.json({ error: "Paid orders could not be loaded. Try again in a moment." }, { status: 503 });
   }
