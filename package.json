@@ -17,10 +17,11 @@
     "db:migrate": "node scripts/migrate.mjs",
     "test:journey": "node --experimental-strip-types tests/accounts-journey.browser.mjs",
     "test:hosted": "playwright test -c playwright.hosted.config.ts",
-    "setup:doctor": "node scripts/setup-doctor.mjs check setup.json"
+    "setup:doctor": "node scripts/setup-doctor.mjs check setup.json",
+    "test:layout": "node tests/layout-identity.browser.mjs"
   },
   "dependencies": {
-    "@royer/auth": "file:vendor/royer-auth-0.1.0-rc.4.tgz",
+    "@royer/auth": "file:vendor/royer-auth-0.1.0-rc.5.tgz",
     "@stripe/react-stripe-js": "^6.8.2",
     "@stripe/stripe-js": "^9.14.0",
     "@tanstack/react-form": "^1.33.5",

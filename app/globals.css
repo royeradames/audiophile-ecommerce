@@ -121,7 +121,7 @@ h3 {
 .eyebrow,
 .overline {
   margin-bottom: 16px;
-  font-size: 0.875rem;
+  font-size: 1rem; /* 16 px floor */
   font-weight: 800;
   letter-spacing: 0.18em;
   line-height: 1.4;
@@ -159,7 +159,7 @@ h3 {
   border: 2px solid transparent;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 1rem; /* 16 px floor */
   letter-spacing: 0.12em;
   line-height: 1.2;
   text-align: center;
@@ -211,7 +211,7 @@ h3 {
   background: transparent;
   color: var(--ink-soft);
   cursor: pointer;
-  font-size: 0.9375rem;
+  font-size: 1rem; /* 16 px floor */
   text-decoration: underline;
   text-underline-offset: 4px;
 }
@@ -250,15 +250,16 @@ h3 {
 
 .primary-nav {
   display: flex;
-  gap: 32px;
+  flex-wrap: wrap;
+  gap: clamp(16px, 2.2vw, 32px);
   align-items: center;
   justify-content: center;
 }
 
 .primary-nav a,
 .site-footer nav a {
-  font-size: 0.875rem;
-  letter-spacing: 0.14em;
+  font-size: 1rem; /* 16 px floor */
+  letter-spacing: 0.08em;
   text-decoration: none;
   text-transform: uppercase;
 }
@@ -277,7 +278,7 @@ h3 {
   background: transparent;
   color: #fff;
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 1rem; /* 16 px floor */
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -296,7 +297,8 @@ h3 {
   border-radius: 999px;
   background: var(--accent);
   color: #fff;
-  font-size: 0.8125rem;
+  font-size: 1rem; /* 16 px floor */
+  line-height: 1;
 }
 
 .menu-button {
@@ -383,7 +385,7 @@ h3 {
 
 .category-card > span {
   color: var(--ink-soft);
-  font-size: 0.875rem;
+  font-size: 1rem; /* 16 px floor */
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -426,9 +428,9 @@ h3 {
 }
 
 .feature-zx9 h3 {
-  max-width: 6ch;
+  /* The markup breaks "ZX9 / SPEAKER" onto two lines, as in the design. */
   margin-bottom: 24px;
-  font-size: clamp(3rem, 5vw, 4rem);
+  font-size: clamp(2.25rem, 4.5vw, 3.5rem);
   text-transform: uppercase;
 }
 
@@ -587,11 +589,9 @@ h3 {
 .product-summary h1,
 .product-summary h2 {
   margin-bottom: 28px;
+  font-size: clamp(1.75rem, 3.2vw, 2.5rem);
+  overflow-wrap: break-word;
   text-transform: uppercase;
-}
-
-.product-summary h2 {
-  font-size: clamp(2.25rem, 4vw, 3rem);
 }
 
 .product-detail {
@@ -662,7 +662,7 @@ h3 {
 .quantity-control span {
   display: grid;
   place-items: center;
-  font-size: 0.9375rem;
+  font-size: 1rem; /* 16 px floor */
   font-weight: 800;
 }
 
@@ -712,6 +712,13 @@ h3 {
   border-radius: var(--radius);
 }
 
+.recommendation-grid .button {
+  /* Three narrow columns on a small tablet: room for "See product" on one line,
+     and it may still wrap inside the button when a reader enlarges text. */
+  max-width: 100%;
+  padding-inline: clamp(12px, 2.4vw, 27px);
+}
+
 .recommendation-grid h3 {
   font-size: 1.5rem;
   text-transform: uppercase;
@@ -755,7 +762,7 @@ h3 {
 
 .cart-heading .eyebrow {
   margin-bottom: 5px;
-  font-size: 0.75rem;
+  font-size: 1rem; /* 16 px floor */
 }
 
 .cart-list,
@@ -790,7 +797,7 @@ h3 {
 .cart-item-copy strong,
 .summary-list strong {
   overflow: hidden;
-  font-size: 0.9375rem;
+  font-size: 1rem; /* 16 px floor */
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -798,7 +805,7 @@ h3 {
 .cart-item-copy span,
 .summary-list span {
   color: var(--ink-soft);
-  font-size: 0.875rem;
+  font-size: 1rem; /* 16 px floor */
   font-weight: 700;
 }
 
@@ -909,7 +916,7 @@ legend {
   width: 100%;
   margin-bottom: 22px;
   color: var(--accent-dark);
-  font-size: 0.9375rem;
+  font-size: 1rem; /* 16 px floor */
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -918,14 +925,14 @@ legend {
 .form-grid {
   display: grid;
   gap: 22px;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .form-field {
   display: grid;
   gap: 8px;
   color: var(--ink);
-  font-size: 0.9375rem;
+  font-size: 1rem; /* 16 px floor */
   font-weight: 800;
 }
 
@@ -934,6 +941,9 @@ legend {
 }
 
 .form-field input {
+  /* Inputs otherwise keep their default ~20ch width and push out of narrow columns. */
+  width: 100%;
+  min-width: 0;
   min-height: 58px;
   padding: 15px 18px;
   border: 1.5px solid #bcb5af;
@@ -953,7 +963,7 @@ legend {
 
 .form-field small {
   color: var(--danger);
-  font-size: 0.875rem;
+  font-size: 1rem; /* 16 px floor */
   font-weight: 700;
 }
 
@@ -1008,13 +1018,13 @@ legend {
 .pickup-city > p {
   margin: 0;
   color: var(--ink);
-  font-size: 0.9375rem;
+  font-size: 1rem; /* 16 px floor */
   font-weight: 800;
 }
 
 .pickup-city small {
   color: var(--danger);
-  font-size: 0.875rem;
+  font-size: 1rem; /* 16 px floor */
   font-weight: 700;
 }
 
@@ -1028,15 +1038,23 @@ legend {
 
 .instruction-list li {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
+/* The label and value take the row; Copy drops below when the column is narrow. */
+.instruction-list li > span {
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .instruction-list strong {
   display: block;
   color: var(--ink);
-  font-size: 0.75rem;
+  font-size: 1rem; /* 16 px floor */
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1049,7 +1067,7 @@ legend {
   border-radius: 6px;
   background: #fff;
   color: var(--ink);
-  font-size: 0.875rem;
+  font-size: 1rem; /* 16 px floor */
   font-weight: 800;
 }
 
@@ -1064,15 +1082,21 @@ legend {
 
 .stack-intro {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 40px;
 }
 
+.stack-intro > div:first-child {
+  flex: 1 1 22rem;
+  min-width: 0;
+}
+
 .stack-intro h1 {
   margin-bottom: 14px;
-  font-size: clamp(2.3rem, 5vw, 3.4rem);
+  font-size: clamp(1.75rem, 5vw, 3.4rem);
   text-transform: uppercase;
 }
 
@@ -1099,7 +1123,7 @@ legend {
   margin: 0 0 36px;
   padding: 0;
   list-style: none;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
 }
 
 .stack-methods li,
@@ -1127,7 +1151,7 @@ legend {
 .stack-status {
   margin: 0;
   color: var(--accent-dark);
-  font-size: 0.75rem;
+  font-size: 1rem; /* 16 px floor */
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -1138,6 +1162,12 @@ legend {
   align-items: start;
   gap: 30px;
   grid-template-columns: minmax(0, 1.5fr) minmax(330px, 0.72fr);
+}
+
+/* Grid items default to min-width: auto and push past a phone's width. */
+.stack-layout > *,
+.checkout-layout > * {
+  min-width: 0;
 }
 
 .stack-editor fieldset {
@@ -1152,7 +1182,7 @@ legend {
 .stack-banks {
   display: grid;
   gap: 18px;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
 }
 
 .stack-bank {
@@ -1213,7 +1243,7 @@ legend {
 .order-meta dd span {
   display: block;
   color: var(--ink-soft);
-  font-size: 0.875rem;
+  font-size: 1rem; /* 16 px floor */
   font-weight: 700;
   letter-spacing: 0;
   text-transform: none;
@@ -1275,7 +1305,7 @@ legend {
 
 .order-meta dt {
   color: var(--ink);
-  font-size: 0.75rem;
+  font-size: 1rem; /* 16 px floor */
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1385,7 +1415,7 @@ legend {
   padding: clamp(28px, 5vw, 54px);
   border-radius: var(--radius);
   background: #fff;
-  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+  grid-template-columns: minmax(min(100%, 260px), 0.8fr) minmax(0, 1.2fr);
 }
 
 .zelle-qr-frame {
@@ -1418,7 +1448,7 @@ legend {
 .zelle-qr-caption strong {
   display: block;
   color: var(--ink);
-  font-size: 0.75rem;
+  font-size: 1rem; /* 16 px floor */
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1476,7 +1506,7 @@ legend {
 
 .totals dt {
   color: var(--ink-soft);
-  font-size: 0.9375rem;
+  font-size: 1rem; /* 16 px floor */
 }
 
 .totals dd {
@@ -1609,21 +1639,23 @@ legend {
 @media (max-width: 900px) {
   .header-inner {
     grid-template-columns: 1fr auto 1fr;
+    /* The bar keeps its height when the open menu adds a second row. */
+    grid-template-rows: 92px;
   }
 
   .menu-button {
     display: block;
   }
 
+  /* The open menu is a full-width row in the header, so it pushes the page
+     down instead of covering it. */
   .primary-nav {
-    position: absolute;
-    top: 92px;
-    right: -20px;
-    left: -20px;
+    grid-column: 1 / -1;
+    order: 4;
     display: none;
-    padding: 30px 20px;
-    background: #171717;
-    box-shadow: 0 20px 40px rgb(0 0 0 / 0.28);
+    /* Inside the header's own dark background: no band to paint past the box. */
+    padding: 30px 0;
+    border-top: 1px solid rgb(255 255 255 / 0.18);
   }
 
   .primary-nav.is-open {
@@ -1656,6 +1688,10 @@ legend {
     padding: 58px 12%;
     background-position: center -250px;
     text-align: center;
+  }
+
+  .feature-zx9 h3 {
+    font-size: 3.5rem; /* design: 56 px on tablet */
   }
 
   .feature-zx9 img {
@@ -1714,7 +1750,7 @@ legend {
   }
 
   .stack-methods {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
   }
 
   .order-summary,
@@ -1760,6 +1796,7 @@ legend {
 
   .header-inner {
     min-height: 80px;
+    grid-template-rows: 80px;
   }
 
   .checkout-page {
@@ -1774,7 +1811,7 @@ legend {
   .menu-button {
     min-width: 46px;
     padding: 0;
-    font-size: 0.8125rem;
+    font-size: 1rem; /* 16 px floor */
   }
 
   .cart-button span {
@@ -1784,9 +1821,6 @@ legend {
   }
 
   .primary-nav {
-    top: 80px;
-    right: -16px;
-    left: -16px;
     flex-direction: column;
   }
 
@@ -1837,7 +1871,7 @@ legend {
   }
 
   .feature-zx9 h3 {
-    font-size: 3.2rem;
+    font-size: clamp(1.75rem, 9.6vw, 2.25rem); /* design: 36 px at 375 */
   }
 
   .feature-zx7 {
@@ -1883,7 +1917,7 @@ legend {
 
   .product-summary h1,
   .product-summary h2 {
-    font-size: 2.25rem;
+    font-size: 1.75rem;
   }
 
   .add-to-cart-wrap {
@@ -1947,7 +1981,7 @@ legend {
   .stack-methods,
   .stack-layout,
   .stack-banks {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .stack-intro,

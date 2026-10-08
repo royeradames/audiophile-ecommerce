@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
-import { headers } from "next/headers";
 import "./globals.css";
 import { CartProvider } from "./cart-context";
 import { OrderProvider } from "./order-context";
 import { PayeeProvider } from "./payee-context";
+import { SITE_NAME, SITE_URL } from "./site-identity";
 import { SiteShell } from "./site-shell";
 
 const manrope = Manrope({
@@ -13,16 +13,13 @@ const manrope = Manrope({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost";
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  const origin = `${protocol}://${host}`;
+  const shareImage = new URL("og.png", SITE_URL).href;
   const title = "Audiophile — Sound worth slowing down for";
   const description =
     "A responsive portfolio storefront experiment for considered personal and home audio.";
 
   return {
-    metadataBase: new URL(origin),
+    metadataBase: new URL(SITE_URL),
     title: { default: title, template: "%s | Audiophile" },
     description,
     icons: {
@@ -36,20 +33,22 @@ export async function generateMetadata(): Promise<Metadata> {
       apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
     },
     openGraph: {
+      siteName: SITE_NAME,
       title,
       description,
       type: "website",
-      url: origin,
-      images: [{ url: `${origin}/og.png`, width: 1731, height: 909, alt: "Audiophile — Sound worth slowing down for" }],
+      images: [{ url: shareImage, width: 1731, height: 909, alt: "Audiophile — Sound worth slowing down for" }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [`${origin}/og.png`],
+      images: [shareImage],
     },
   };
 }
+
+const website = { "@context": "https://schema.org", "@type": "WebSite", name: SITE_NAME, url: SITE_URL };
 
 export default function RootLayout({
   children,
@@ -59,6 +58,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={manrope.variable}>
+        <script
+          type="application/ld+json"
+          // App-owned data: one site name everywhere (og:site_name, logo, JSON-LD).
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(website).replace(/</g, "\\u003c") }}
+        />
         <CartProvider>
           <PayeeProvider>
             <OrderProvider>
