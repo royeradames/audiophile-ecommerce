@@ -11,7 +11,8 @@ export const cartItemsSchema = z.array(z.strictObject({
 
 const paymentRequestSchema = z.strictObject({
   orderId: z.string().trim().regex(/^AUD-[A-Z0-9-]{1,64}$/),
-  email: z.email().max(254),
+  // Optional: it only prefills Stripe's fields. The store never keeps it.
+  email: z.email().max(254).optional(),
   items: cartItemsSchema,
 });
 

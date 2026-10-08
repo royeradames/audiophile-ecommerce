@@ -4,6 +4,7 @@ import { stripePublicConfig } from "../../../stripe-env";
 import { readPaymentRequest } from "../../../payment-request";
 import { intentStatus, paymentFromIntent } from "../../../stripe-webhook";
 import { cardIntentFor, payableOrder, recordPayment, settledPaid } from "../../../server/payments";
+import { clientAddress, limits, overLimit, tooManyRequests } from "../../../server/rate-limit";
 import { serverRuntime } from "../../../server/runtime";
 
 export async function GET(request: Request) {
@@ -67,6 +68,18 @@ export async function POST(request: Request) {
     );
   }
 
+  const runtimeForLimit = serverRuntime();
+  if (runtimeForLimit) {
+    try {
+      const wait = await overLimit(runtimeForLimit.db, [
+        { scope: "payments:address", id: clientAddress(request), limit: limits.paymentStartsPerAddress },
+      ]);
+      if (wait !== null) return tooManyRequests(wait, "Too many payment attempts from this connection.");
+    } catch {
+      return Response.json({ error: "Payment could not start. Nothing was charged; please try again." }, { status: 503 });
+    }
+  }
+
   const payment = await readPaymentRequest(request);
   if (!payment.ok) {
     return Response.json({ error: payment.error }, { status: payment.status });
@@ -77,7 +90,7 @@ export async function POST(request: Request) {
     try {
       const payable = await payableOrder(runtime.db, payment, "element");
       if (!payable.ok) return Response.json({ error: payable.error }, { status: payable.status });
-      const intent = await cardIntentFor(runtime.db, payable.order);
+      const intent = await cardIntentFor(runtime.db, payable.order, payment.email);
       if (!intent.ok) return Response.json({ error: intent.error }, { status: intent.status });
       return Response.json({ clientSecret: intent.clientSecret, amount: payable.order.grandTotal });
     } catch {

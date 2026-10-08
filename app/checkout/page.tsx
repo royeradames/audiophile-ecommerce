@@ -26,6 +26,7 @@ import {
 import { usePayeeSettings } from "../payee-context";
 import { startHostedCheckout } from "../stripe-client";
 import { createServerOrder, fetchCustomer, fetchStoreFeatures } from "../store-client";
+import { sampleCheckoutDetails } from "../demo-store";
 import type { PaymentRequest } from "../payment-request";
 
 const fieldOrder = [
@@ -434,11 +435,27 @@ export default function CheckoutPage() {
                 a dedicated AZUL terminal in the Dominican Republic. Payee
                 details come from the <Link href="/payments">payment stack</Link>.
               </p>
-              {features?.durableOrders ? (
-                <p className="account-note">
-                  Use fictional details: this demo store saves orders on its server so their links work in any browser.
+              <div className="demo-checkout-note" role="note" aria-label="Demo store">
+                <p>
+                  <strong>Demo store:</strong> nothing is sold, charged or shipped. Test the whole
+                  flow with fictional details and Stripe&apos;s test card.
                 </p>
-              ) : null}
+                <p>
+                  The store keeps your order, its total and your country for the tax label.
+                  Your name, email, phone and address stay in this browser.
+                </p>
+                <button
+                  className="button button-outline"
+                  type="button"
+                  onClick={() => {
+                    for (const [name, value] of Object.entries(sampleCheckoutDetails)) {
+                      form.setFieldValue(name as keyof typeof sampleCheckoutDetails, value);
+                    }
+                  }}
+                >
+                  Fill sample details
+                </button>
+              </div>
               <AccountNotice account={account} />
               {canceled ? (
                 <CanceledCheckoutNotice order={returnedOrder} />

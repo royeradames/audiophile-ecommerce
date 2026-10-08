@@ -50,7 +50,7 @@ export async function payableOrder(
   if (!order) return { ok: false, status: 404, error: "No order has that ID. Place the order again from checkout." };
   const sameItems = request.items.length === order.lines.length &&
     request.items.every((item) => order.lines.some((line) => line.productId === item.productId && line.quantity === item.quantity));
-  if (order.email.toLowerCase() !== request.email.toLowerCase() || !sameItems) {
+  if (!sameItems) {
     return { ok: false, status: 409, error: "These details do not match the saved order. Reload the order and try again." };
   }
   if (order.status !== "pending_hosted") {
@@ -78,7 +78,7 @@ const reusableStatuses = new Set(["requires_payment_method", "requires_confirmat
  * second charge, one still processing blocks a new charge, and an unfinished
  * one is reused, so cancelling and retrying keeps one order and one charge.
  */
-export async function cardIntentFor(db: pg.Pool, order: StoredOrder): Promise<{ ok: true; clientSecret: string } | Refusal> {
+export async function cardIntentFor(db: pg.Pool, order: StoredOrder, email?: string): Promise<{ ok: true; clientSecret: string } | Refusal> {
   let reusable: string | null = null;
   for (const attempt of await openAttempts(db, order.id)) {
     const intent = await retrieveStripePaymentIntent(attempt.payment_intent_id);
@@ -100,7 +100,7 @@ export async function cardIntentFor(db: pg.Pool, order: StoredOrder): Promise<{ 
   const intent = await createStripePaymentIntent({
     orderId: order.id,
     amountCents: order.totalCents,
-    email: order.email,
+    email,
     idempotencyKey: `audiophile:${order.id}:intent:${attempt}`,
   });
   if (typeof intent.id !== "string" || typeof intent.client_secret !== "string" || intent.livemode === true) {
@@ -126,7 +126,7 @@ export async function cardIntentFor(db: pg.Pool, order: StoredOrder): Promise<{ 
 export async function hostedCheckoutFor(
   db: pg.Pool,
   order: StoredOrder,
-  input: { origin: string; description: string },
+  input: { origin: string; description: string; email?: string },
 ): Promise<{ ok: true; url: string } | Refusal> {
   const earlier = await checkoutSessionsFor(db, order.id);
   for (const sessionId of earlier) {
@@ -142,7 +142,7 @@ export async function hostedCheckoutFor(
   const session = await createStripeCheckoutSession({
     orderId: order.id,
     amountCents: order.totalCents,
-    email: order.email,
+    email: input.email,
     origin: input.origin,
     description: input.description,
     // Simultaneous requests (two tabs, a double click) get the same page.

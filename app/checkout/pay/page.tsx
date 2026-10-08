@@ -35,10 +35,6 @@ function CheckoutPayClient() {
   const [error, setError] = useState<string | null>(null);
   const [paid, setPaid] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [email, setEmail] = useState("");
-  // The card form starts only after the shopper confirms the email, so typing
-  // does not send a payment request per keystroke.
-  const [payerEmail, setPayerEmail] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
   const local = orders.find((item) => item.id === orderId);
 
@@ -98,7 +94,8 @@ function CheckoutPayClient() {
     );
   }
 
-  const payer = local?.customer.email ?? payerEmail;
+  // Only prefills Stripe's fields when this browser placed the order.
+  const payer = local?.customer.email;
   const canPay = order.status === "pending_hosted" && !paid && !confirming;
 
   return (
@@ -125,36 +122,8 @@ function CheckoutPayClient() {
 
         <OrderSummaryCard order={paid ? { ...order, status: "paid" } : order} headingLevel={2} />
 
-        {canPay && !payer ? (
-          <form
-            className="pay-email"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (email.trim()) setPayerEmail(email.trim());
-            }}
-          >
-            <label className="form-field" htmlFor="pay-email">
-              <span>Email used at checkout</span>
-              <input
-                id="pay-email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
-            </label>
-            <button className="button button-primary" type="submit">Continue to payment</button>
-          </form>
-        ) : null}
-
-        {canPay && payer ? (
+        {canPay ? (
           <div className="pay-actions">
-            {!local ? (
-              <button className="text-button" type="button" onClick={() => setPayerEmail(null)}>
-                Use a different email
-              </button>
-            ) : null}
             {order.payment === "element" ? (
               <CardPayment
                 orderId={order.id}

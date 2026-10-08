@@ -39,7 +39,6 @@ type OrderRow = {
   status: OrderStatus;
   payment_method: PaymentMethod;
   pickup_city: PickupCity | "";
-  email: string;
   subtotal_cents: number;
   shipping_cents: number;
   tax_cents: number;
@@ -50,10 +49,13 @@ type OrderRow = {
 
 type ItemRow = { order_id: string; product_id: string; name: string; quantity: number; unit_price_cents: number };
 
-/** An order plus the private fields the server checks but never returns. */
-export type StoredOrder = OrderSummary & { email: string; customerId: string | null; totalCents: number };
+/**
+ * An order plus the fields the server checks but never returns. This is a
+ * demo store: no name, email, phone or address is ever stored here.
+ */
+export type StoredOrder = OrderSummary & { customerId: string | null; totalCents: number };
 
-const orderColumns = `"id", "request_key", "customer_id", "status", "payment_method", "pickup_city", "email",
+const orderColumns = `"id", "request_key", "customer_id", "status", "payment_method", "pickup_city",
   "subtotal_cents", "shipping_cents", "tax_cents", "total_cents", "created_at", "settled_at"`;
 
 function toStored(row: OrderRow, items: ItemRow[]): StoredOrder {
@@ -75,13 +77,12 @@ function toStored(row: OrderRow, items: ItemRow[]): StoredOrder {
     vat: row.tax_cents / 100,
     grandTotal: row.total_cents / 100,
     savedToAccount: row.customer_id !== null,
-    email: row.email,
     customerId: row.customer_id,
     totalCents: row.total_cents,
   };
 }
 
-/** The public view: no email, address or customer ID. */
+/** The public view: no customer ID. */
 export function toSummary(order: StoredOrder): OrderSummary {
   return {
     id: order.id,
@@ -145,8 +146,7 @@ export type CreateOrderResult =
 function sameSubmission(existing: StoredOrder, input: NewOrder, customerId: string | null) {
   const requested = [...input.items].sort((a, b) => a.productId.localeCompare(b.productId));
   const stored = [...existing.lines].sort((a, b) => a.productId.localeCompare(b.productId));
-  return existing.email.toLowerCase() === input.customer.email.toLowerCase() &&
-    existing.payment === input.payment &&
+  return existing.payment === input.payment &&
     existing.customerId === customerId &&
     requested.length === stored.length &&
     requested.every((item, index) => item.productId === stored[index].productId && item.quantity === stored[index].quantity);
@@ -155,6 +155,8 @@ function sameSubmission(existing: StoredOrder, input: NewOrder, customerId: stri
 /**
  * Creates the order from server-calculated totals before any payment starts.
  * Retrying the same submission (same request key) returns the same order.
+ * Only the country is kept from the shopper's details, for the tax label;
+ * name, email, phone and address stay in the browser (demo store).
  */
 export async function createOrder(pool: pg.Pool, input: NewOrder, customerId: string | null): Promise<CreateOrderResult> {
   const priced = priceCart(input.items);
@@ -164,15 +166,13 @@ export async function createOrder(pool: pg.Pool, input: NewOrder, customerId: st
   return inTransaction(pool, async (tx) => {
     const inserted = await tx.query<OrderRow>(
       `insert into "audiophile_orders" ("id", "request_key", "customer_id", "status", "payment_method", "pickup_city",
-          "customer_name", "email", "phone", "address", "zip", "city", "country",
-          "subtotal_cents", "shipping_cents", "tax_cents", "total_cents")
-        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+          "country", "subtotal_cents", "shipping_cents", "tax_cents", "total_cents")
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         on conflict ("request_key") do nothing
         returning ${orderColumns}`,
       [
         newOrderId(), input.requestKey, customerId, initialStatus(input.payment), input.payment, input.pickupCity,
-        input.customer.name, input.customer.email, input.customer.phone, input.customer.address,
-        input.customer.zip, input.customer.city, input.customer.country,
+        input.customer.country,
         cents(priced.totals.subtotal), cents(priced.totals.shipping), cents(priced.totals.tax), priced.amountCents,
       ],
     );
@@ -300,4 +300,26 @@ export async function claimStripeEvent(tx: Transaction, eventId: string, type: s
     [eventId, type, orderId],
   );
   return rowCount === 1;
+}
+
+const unpaidStatuses = ["pending_hosted", "pending_transfer", "pending_in_person", "cancelled"];
+
+/**
+ * Removes orders that were never paid within seven days, with their items,
+ * payment attempts and webhook receipts, plus rate-limit windows older than a
+ * day. Paid orders stay. Run daily by Vercel Cron.
+ */
+export async function purgeAbandonedOrders(pool: pg.Pool) {
+  return inTransaction(pool, async (tx) => {
+    const { rows } = await tx.query<{ id: string }>(
+      `delete from "audiophile_orders"
+        where "status" = any($1::text[]) and "created_at" < now() - interval '7 days'
+        returning "id"`,
+      [unpaidStatuses],
+    );
+    const ids = rows.map((row) => row.id);
+    await tx.query(`delete from "audiophile_stripe_events" where "order_id" = any($1::text[])`, [ids]);
+    const limits = await tx.query(`delete from "audiophile_rate_limits" where "window_start" < now() - interval '1 day'`);
+    return { purgedOrders: ids.length, purgedRateLimitWindows: limits.rowCount ?? 0 };
+  });
 }

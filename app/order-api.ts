@@ -4,6 +4,8 @@ import { paymentMethods } from "./payment-methods";
 
 /** What this deployment offers. The guest-only Sites fallback has neither. */
 export type StoreFeatures = {
+  /** Always true: nothing is sold, charged for real or shipped. */
+  demo: boolean;
   durableOrders: boolean;
   accounts: "enabled" | "coming_soon";
 };

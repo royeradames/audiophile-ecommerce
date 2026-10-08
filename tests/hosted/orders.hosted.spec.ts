@@ -2,12 +2,12 @@ import { expect, test, type Browser } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { authorizePreviews, payWithTestCard, shopOrigin } from "./hosted-env";
 
-// Fictional buyer. Every address starts with "suite-" at the reserved
-// example.test domain so cleanup can find and remove these orders.
+// Fictional buyer. The store keeps only the country, so the suite marks its
+// orders with a reserved fictional country that cleanup removes.
 const run = Date.now().toString(36) + randomBytes(3).toString("hex");
 const buyer = {
   name: "Suite Buyer", email: `suite-${run}@example.test`, phone: "+1 202 555 0148",
-  address: "1 Fictional Test Street", zip: "10001", city: "Demo City", country: "United States",
+  address: "1 Fictional Test Street", zip: "10001", city: "Demo City", country: "Hosted Suite Testland",
 };
 
 async function newPage(browser: Browser) {

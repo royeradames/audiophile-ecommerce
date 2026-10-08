@@ -31,7 +31,8 @@ async function stripeRequest(path: string, init: RequestInit) {
 export async function createStripeCheckoutSession(input: {
   orderId: string;
   amountCents: number;
-  email: string;
+  /** Prefills Stripe's page; never stored by the store. */
+  email?: string;
   origin: string;
   description: string;
   /** Stripe returns the same session for a repeated key instead of creating another. */
@@ -40,7 +41,7 @@ export async function createStripeCheckoutSession(input: {
   const params = new URLSearchParams();
   params.set("mode", "payment");
   params.set("client_reference_id", input.orderId);
-  params.set("customer_email", input.email);
+  if (input.email) params.set("customer_email", input.email);
   params.set("success_url", `${input.origin}/checkout/stripe?order=${encodeURIComponent(input.orderId)}&session_id={CHECKOUT_SESSION_ID}`);
   params.set("cancel_url", `${input.origin}/checkout?canceled=1&order=${encodeURIComponent(input.orderId)}`);
   params.set("metadata[order_id]", input.orderId);
@@ -77,14 +78,13 @@ export async function retrieveStripePaymentIntent(intentId: string) {
 export async function createStripePaymentIntent(input: {
   orderId: string;
   amountCents: number;
-  email: string;
+  email?: string;
   /** Stripe returns the same intent for a repeated key instead of creating another. */
   idempotencyKey?: string;
 }) {
   const params = new URLSearchParams();
   params.set("amount", String(input.amountCents));
   params.set("currency", "usd");
-  params.set("receipt_email", input.email);
   params.set("metadata[order_id]", input.orderId);
   params.set("automatic_payment_methods[enabled]", "true");
   params.set("description", `Audiophile ${input.orderId}`);

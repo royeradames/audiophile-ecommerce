@@ -72,7 +72,7 @@ test("a Breakthrough account keeps its Audiophile order history across browsers"
   await page.getByRole("button", { name: "Add to cart", exact: true }).click();
   await page.goto(shopOrigin + "/checkout");
   await expect(page.getByText(`Signed in as ${owner.name}. This order will be saved to your account.`)).toBeVisible();
-  const details = { name: owner.name, email: owner.email, phone: "+1 202 555 0148", address: "1 Fictional Test Street", zip: "10001", city: "Demo City", country: "United States" };
+  const details = { name: owner.name, email: owner.email, phone: "+1 202 555 0148", address: "1 Fictional Test Street", zip: "10001", city: "Demo City", country: "Hosted Suite Testland" };
   for (const [id, value] of Object.entries(details)) await page.locator(`#${id}`).fill(value);
   await page.locator('input[name="payment"][value="transfer"]').check();
   const created = page.waitForResponse((r) => r.url() === shopOrigin + "/api/orders" && r.request().method() === "POST");

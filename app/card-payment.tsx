@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPaymentIntent, fetchStripeConfig, fetchStripePaymentIntent } from "./stripe-client";
 import type { PaymentRequest } from "./payment-request";
 import { formatUsd } from "./checkout-totals";
+import { testCardHint } from "./demo-store";
 
 type CardPaymentProps = PaymentRequest & {
   /** `recorded` is false when Stripe accepted the payment but the store has not confirmed it yet. */
@@ -88,7 +89,7 @@ function CardPaymentForm({
   onPaid,
 }: {
   amount: number;
-  email: string;
+  email?: string;
   onPaid: (recorded: boolean) => void;
 }) {
   const stripe = useStripe();
@@ -131,14 +132,15 @@ function CardPaymentForm({
         setSubmitting(false);
       }}
     >
+      <p className="test-card-hint">{testCardHint}</p>
       <PaymentElement
         options={{
           layout: "tabs",
-          defaultValues: { billingDetails: { email } },
+          ...(email ? { defaultValues: { billingDetails: { email } } } : {}),
           wallets: { applePay: "auto", googlePay: "auto" },
         }}
       />
-      {error ? <p className="stack-hint">{error}</p> : null}
+      {error ? <p className="stack-hint" role="alert">{error}</p> : null}
       <button className="button button-primary button-block" type="submit" aria-busy={submitting || !stripe}>
         {!stripe ? "Loading Stripe…" : submitting ? "Paying…" : `Pay ${formatUsd(amount)} (Stripe test)`}
       </button>

@@ -1,5 +1,6 @@
 import type { FederatedAuth } from "@royer/auth/federation";
 import type pg from "pg";
+import { DEMO_STORE } from "../demo-store";
 import type { StoreFeatures } from "../order-api";
 
 // The owner-only Sites fallback stays guest-only: orders live in the browser
@@ -14,7 +15,7 @@ export function serverRuntime(): { db: pg.Pool; accounts: FederatedAuth | null }
 }
 
 export function storeFeatures(): StoreFeatures {
-  return { durableOrders: false, accounts: "coming_soon" };
+  return { demo: DEMO_STORE, durableOrders: false, accounts: "coming_soon" };
 }
 
 export async function customerFor(): Promise<CustomerCheck> {

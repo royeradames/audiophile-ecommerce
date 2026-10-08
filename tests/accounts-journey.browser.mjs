@@ -99,7 +99,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   const features = await (await fetch(`http://127.0.0.1:${ports.app}/api/store/features`)).json();
-  assert.deepEqual(features, { durableOrders: true, accounts: "enabled" });
+  assert.deepEqual(features, { demo: true, durableOrders: true, accounts: "enabled" });
   if (process.env.JOURNEY_PROBE) {
     const probe = await new Promise((resolve, reject) => {
       const req = httpRequest({ host: "127.0.0.1", port: ports.app, method: "POST", path: "/api/auth/federation/start",

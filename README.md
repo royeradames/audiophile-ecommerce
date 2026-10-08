@@ -4,6 +4,8 @@ Responsive portfolio storefront experiment adapted from Frontend Mentor's Audiop
 
 ## Product boundary
 
+**Demo store (Royer, October 8, 2026).** Nothing is sold, charged for real or shipped. Every page says so, Stripe runs in test mode only and a live key is refused, checkout offers **Fill sample details**, and card payment shows Stripe's test card. The server keeps orders, items, totals, payment status and the country (for the tax label); name, email, phone and address stay in the shopper's browser. Orders never paid are deleted after 7 days by a daily Vercel Cron (`/api/cron/purge-orders`, authorized by `CRON_SECRET`), and order creation and payment starts are rate limited per hashed address and per anonymous browser session.
+
 - Six fictional audio products across headphones, speakers, and earphones.
 - The cart and payee mocks persist in the current browser. On Vercel, orders are created on the server from catalog prices before any payment and stored in PostgreSQL (Neon); the owner-only Sites fallback stays guest-only and keeps orders in the browser.
 - Customer accounts use the central Breakthrough account (`@royer/auth` 0.1.0-rc.4, central mode). They are on only where the issuer registered the deployment, today the protected Preview; production says "accounts coming soon". Guest checkout always works.

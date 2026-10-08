@@ -1994,10 +1994,6 @@ legend {
   font-weight: 700;
 }
 
-.pay-email {
-  max-width: 420px;
-  margin-top: 28px;
-}
 
 .pay-actions {
   margin-top: 28px;
@@ -2029,8 +2025,56 @@ legend {
   margin-bottom: 24px;
 }
 
-.pay-email {
+
+/* Demo store notices */
+.demo-banner {
+  margin: 0;
+  padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+  padding-top: max(10px, env(safe-area-inset-top));
+  background: var(--accent-dark);
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1.4;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.demo-checkout-note {
   display: grid;
-  gap: 16px;
   justify-items: start;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 18px;
+  border-left: 4px solid var(--accent);
+  background: var(--warm);
+}
+
+.demo-checkout-note p {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--ink);
+}
+
+.checkout-intro .account-note {
+  margin-top: 16px;
+}
+
+.test-card-hint {
+  margin: 0 0 16px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.card-payment .stack-hint {
+  margin: 12px 0;
+}
+
+.dialog-layer {
+  padding-bottom: max(40px, env(safe-area-inset-bottom));
+  padding-left: max(20px, env(safe-area-inset-left));
+  padding-right: max(20px, env(safe-area-inset-right));
+}
+
+.checkout-intro .stack-hint {
+  margin: 16px 0 0;
 }

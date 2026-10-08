@@ -66,7 +66,7 @@ function intentEvent(eventId: string, orderId: string, overrides: Record<string,
 test("the store reports durable orders when a database is configured", async (t) => {
   await withDatabase(t);
   const response = await featuresRoute.GET();
-  assert.deepEqual(await response.json(), { durableOrders: true, accounts: "coming_soon" });
+  assert.deepEqual(await response.json(), { demo: true, durableOrders: true, accounts: "coming_soon" });
 });
 
 test("an order is created from server prices, ignoring any browser total", async (t) => {
@@ -252,7 +252,7 @@ test("a broken account setting keeps checkout working and shows accounts as comi
     AUTH_BASE_URL: "https://shop.example", AUTH_SECRET: "too-short", AUTH_ISSUER_URL: "https://issuer.example/api/auth/",
     AUTH_CLIENT_ID: "synthetic", AUTH_CLIENT_SECRET: "synthetic",
   });
-  assert.deepEqual(await (await featuresRoute.GET()).json(), { durableOrders: true, accounts: "coming_soon" });
+  assert.deepEqual(await (await featuresRoute.GET()).json(), { demo: true, durableOrders: true, accounts: "coming_soon" });
   assert.equal((await placeOrder()).status, 201);
 });
 
