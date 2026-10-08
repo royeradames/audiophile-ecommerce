@@ -1,10 +1,12 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "../site-identity";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
+  path: "/payments",
+  private: true,
   title: "Payment stack",
   description:
     "Dev-test payee details for Banreservas, Banco Popular, and Zelle. Checkout reads these values from this browser.",
-};
+});
 
 export default function PaymentsLayout({
   children,
