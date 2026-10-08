@@ -713,10 +713,11 @@ h3 {
 }
 
 .recommendation-grid .button {
-  /* Three narrow columns on a small tablet: keep "See product" on one line. */
+  /* Three narrow columns on a small tablet: room for "See product" on one line,
+     and it may still wrap inside the button when a reader enlarges text. */
   max-width: 100%;
   padding-inline: clamp(12px, 2.4vw, 27px);
-  white-space: nowrap;
+  letter-spacing: clamp(0.06em, 0.9vw, 0.12em);
 }
 
 .recommendation-grid h3 {
@@ -1653,11 +1654,9 @@ legend {
     grid-column: 1 / -1;
     order: 4;
     display: none;
-    padding: 30px 20px;
-    background: #171717;
-    /* Paint the dark band edge to edge without widening the header box. */
-    box-shadow: 0 0 0 100vmax #171717, 0 20px 40px rgb(0 0 0 / 0.28);
-    clip-path: inset(0 -100vmax -40px);
+    /* Inside the header's own dark background: no band to paint past the box. */
+    padding: 30px 0;
+    border-top: 1px solid rgb(255 255 255 / 0.18);
   }
 
   .primary-nav.is-open {
@@ -1693,7 +1692,7 @@ legend {
   }
 
   .feature-zx9 h3 {
-    font-size: clamp(2.25rem, 7vw, 3.5rem);
+    font-size: 3.5rem; /* design: 56 px on tablet */
   }
 
   .feature-zx9 img {
@@ -1873,7 +1872,7 @@ legend {
   }
 
   .feature-zx9 h3 {
-    font-size: clamp(1.75rem, 9vw, 3.2rem);
+    font-size: clamp(1.75rem, 9.6vw, 2.25rem); /* design: 36 px at 375 */
   }
 
   .feature-zx7 {

@@ -7,6 +7,38 @@
 //   AUDIOPHILE_URL=http://127.0.0.1:4568 node tests/layout-identity.browser.mjs
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
+import { inflateSync } from "node:zlib";
+
+// Minimal PNG reader (8-bit RGB or RGBA, no interlace), enough for Playwright screenshots.
+function readPng(buffer) {
+  let offset = 8, width = 0, height = 0, channels = 4;
+  const data = [];
+  while (offset < buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    const type = buffer.toString("ascii", offset + 4, offset + 8);
+    const body = buffer.subarray(offset + 8, offset + 8 + length);
+    if (type === "IHDR") { width = body.readUInt32BE(0); height = body.readUInt32BE(4); channels = body[9] === 2 ? 3 : 4; }
+    if (type === "IDAT") data.push(body);
+    offset += 12 + length;
+  }
+  const raw = inflateSync(Buffer.concat(data));
+  const stride = width * channels;
+  const pixels = Buffer.alloc(height * stride);
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[y * (stride + 1)];
+    for (let x = 0; x < stride; x += 1) {
+      const value = raw[y * (stride + 1) + 1 + x];
+      const left = x >= channels ? pixels[y * stride + x - channels] : 0;
+      const up = y > 0 ? pixels[(y - 1) * stride + x] : 0;
+      const upLeft = y > 0 && x >= channels ? pixels[(y - 1) * stride + x - channels] : 0;
+      const p = left + up - upLeft, pa = Math.abs(p - left), pb = Math.abs(p - up), pc = Math.abs(p - upLeft);
+      const paeth = pa <= pb && pa <= pc ? left : pb <= pc ? up : upLeft;
+      const predictor = [0, left, up, (left + up) >> 1, paeth][filter];
+      pixels[y * stride + x] = (value + predictor) & 255;
+    }
+  }
+  return { width, height, channels, pixels };
+}
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || "playwright");
 const base = process.env.AUDIOPHILE_URL || "http://127.0.0.1:4568";
@@ -83,6 +115,10 @@ try {
           const lines = new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size;
           if (lines > 1 && text.length / lines < 8) out.push(`squeezed "${text.slice(0, 30)}" (${lines} lines)`);
         }
+        // Button and link labels stay inside their button.
+        for (const el of document.querySelectorAll("a.button, button")) {
+          if (visible(el) && el.scrollWidth > el.clientWidth + 1) out.push(`label spills its button "${el.textContent.trim().slice(0, 24)}"`);
+        }
         // Fields, bank cards, payment rows and the menu stay inside their box.
         for (const el of document.querySelectorAll(".form-field, .stack-bank, .instruction-list li > *, .recommendation-grid .button, #primary-navigation")) {
           const parent = el.parentElement;
@@ -131,6 +167,12 @@ try {
         const box = el.getBoundingClientRect();
         return box.height > 0 && box.top < nav.bottom - 2 && box.bottom > nav.top + 2;
       });
+      // Hit-test the top edge too, so a positioned or painted overlay is caught as well.
+      for (const el of document.querySelectorAll(".demo-banner, main h1")) {
+        const box = el.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.left + box.width / 2, box.top + 3);
+        if (box.top >= 0 && box.top < innerHeight && hit && !el.contains(hit)) covered.push(el);
+      }
       const inner = document.querySelector(".header-inner").getBoundingClientRect();
       return {
         covered: covered.map((el) => el.textContent.trim().slice(0, 30)),
@@ -141,6 +183,19 @@ try {
     });
     if (state.spills) failures.push(`menu @${width}: open menu spills out of the header box`);
     if (state.pageScroll) failures.push(`menu @${width}: open menu scrolls the page sideways`);
+    // Paint check: the banner's first line must show the banner's own colour (a menu
+    // band painted by a shadow or overlay is invisible to layout and hit tests).
+    const banner = await page.locator(".demo-banner").boundingBox();
+    if (banner) {
+      const shot = readPng(await page.screenshot({ clip: { x: banner.x, y: banner.y + 2, width: banner.width, height: 6 } }));
+      const background = await page.evaluate(() => getComputedStyle(document.querySelector(".demo-banner")).backgroundColor.match(/\d+/g).map(Number));
+      let own = 0;
+      for (let i = 0; i < shot.pixels.length; i += shot.channels) {
+        const distance = Math.abs(shot.pixels[i] - background[0]) + Math.abs(shot.pixels[i + 1] - background[1]) + Math.abs(shot.pixels[i + 2] - background[2]);
+        if (distance < 60) own += 1;
+      }
+      if (own / (shot.pixels.length / shot.channels) < 0.5) failures.push(`menu @${width}: the open menu paints over the demo banner`);
+    }
     if (state.covered.length) failures.push(`menu @${width} covers page text: ${state.covered.join(" | ")}`);
     if (Math.abs(state.bar - barBefore) > 1) failures.push(`menu @${width}: header bar moved ${state.bar - barBefore}px`);
     await page.getByRole("button", { name: "Close" }).click();
@@ -174,11 +229,15 @@ try {
     const identity = await page.evaluate(() => ({
       siteName: document.querySelector('meta[property="og:site_name"]')?.getAttribute("content"),
       website: [...document.querySelectorAll('script[type="application/ld+json"]')].some((s) => {
-        try { return [JSON.parse(s.textContent)].flat().some((item) => item["@type"] === "WebSite" && item.name); } catch { return false; }
+        try {
+          return [JSON.parse(s.textContent)].flat().some((item) => item["@type"] === "WebSite" && item.name === "Audiophile" && item.url === "https://audiophile.royeradames.com/");
+        } catch { return false; }
       }),
+      ogUrl: document.querySelector('meta[property="og:url"]')?.getAttribute("content"),
     }));
     if (identity.siteName !== "Audiophile") failures.push(`${route}: og:site_name is ${identity.siteName}`);
-    if (!identity.website) failures.push(`${route}: no WebSite JSON-LD`);
+    if (!identity.website) failures.push(`${route}: no WebSite JSON-LD with the canonical name and URL`);
+    if ((identity.ogUrl || "").replace(/\/$/, "") !== "https://audiophile.royeradames.com") failures.push(`${route}: og:url is ${identity.ogUrl}`);
   }
 } finally {
   await browser.close();
