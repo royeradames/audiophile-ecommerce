@@ -52,6 +52,31 @@ const routes = [
 const widths = [320, 330, 350, 400, 620, 621, 630, 640, 650, 660, 670, 770, 900, 901, 910, 920, 940, 960, 1000, 1110, 1280, 1920];
 const failures = [];
 
+// Tab from the element that has focus through the header, and report any stop that
+// comes before the previous one in reading order (rows by vertical centre, then left to right).
+async function headerTabOrder(page) {
+  const seen = [];
+  for (let i = 0; i < 14; i += 1) {
+    const stop = await page.evaluate(() => {
+      const el = document.activeElement;
+      if (!el || !el.closest("header")) return null;
+      const box = el.getBoundingClientRect();
+      return { name: el.textContent.trim().slice(0, 20), centre: box.top + box.height / 2, left: box.left };
+    });
+    if (!stop) break;
+    seen.push(stop);
+    await page.keyboard.press("Tab");
+  }
+  const problems = [];
+  if (seen.length < 3) problems.push(`only ${seen.length} header stops reachable by Tab`);
+  for (let i = 1; i < seen.length; i += 1) {
+    const [a, b] = [seen[i - 1], seen[i]];
+    const sameRow = Math.abs(a.centre - b.centre) < 20;
+    if (sameRow ? b.left < a.left : b.centre < a.centre) problems.push(`Tab reaches "${b.name}" after "${a.name}", which is below or right of it`);
+  }
+  return problems;
+}
+
 const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || "chrome", headless: true });
 try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -130,7 +155,7 @@ try {
           if (box.left < left - 1 || box.right > right + 1) out.push(`spills its box: ${el.className || el.id} "${el.textContent.trim().slice(0, 24)}"`);
         }
         // The header: wordmark, nav and cart never touch, and the desktop nav is one line.
-        const parts = [".wordmark", "#primary-navigation", ".cart-button", ".menu-button"]
+        const parts = [".wordmark", ".desktop-nav", ".cart-button", ".menu-button"]
           .map((selector) => document.querySelector(`header ${selector}`))
           .filter((el) => el && visible(el));
         for (let a = 0; a < parts.length; a += 1) {
@@ -141,7 +166,7 @@ try {
             }
           }
         }
-        const nav = document.querySelector("#primary-navigation");
+        const nav = document.querySelector(".desktop-nav");
         if (innerWidth > 900 && nav && visible(nav)) {
           const tops = new Set([...nav.querySelectorAll("a")].map((a) => Math.round(a.getBoundingClientRect().top)));
           if (tops.size > 1) out.push(`desktop nav wraps to ${tops.size} lines`);
@@ -198,6 +223,23 @@ try {
     }
     if (state.covered.length) failures.push(`menu @${width} covers page text: ${state.covered.join(" | ")}`);
     if (Math.abs(state.bar - barBefore) > 1) failures.push(`menu @${width}: header bar moved ${state.bar - barBefore}px`);
+    // Phone tab order with the menu open: Close, wordmark, Cart, then the links.
+    await page.locator(".menu-button").focus();
+    for (const problem of await headerTabOrder(page)) failures.push(`menu @${width}: ${problem}`);
+    // Escape closes the menu and returns focus to its button.
+    await page.keyboard.press("Escape");
+    if (await page.locator("#primary-navigation").isVisible()) failures.push(`menu @${width}: Escape left the menu open`);
+    if (!(await page.evaluate(() => document.activeElement?.classList.contains("menu-button")))) failures.push(`menu @${width}: Escape did not return focus to the menu button`);
+    if (await page.locator("#primary-navigation").isVisible()) await page.locator(".menu-button").click();
+    await menu.click();
+    // With the menu open, the cart dialog owns Escape: it closes, the menu stays.
+    await page.locator(".cart-button").click();
+    await page.keyboard.press("Escape");
+    if (await page.locator(".cart-panel").isVisible()) failures.push(`menu @${width}: Escape left the cart open`);
+    if (!(await page.locator("#primary-navigation").isVisible())) {
+      failures.push(`menu @${width}: Escape in the cart also closed the menu`);
+      await menu.click();
+    }
     await page.getByRole("button", { name: "Close" }).click();
     if (await page.locator("#primary-navigation").isVisible()) failures.push(`menu @${width}: Close left the menu open`);
     await menu.click();
@@ -223,6 +265,25 @@ try {
   });
   failures.push(...cart.map((problem) => `cart dialog @320: ${problem}`));
 
+  // The open menu closes when the window widens past 900 px, so it never reopens by itself.
+  await page.setViewportSize({ width: 768, height: 800 });
+  await page.goto(base + "/");
+  await page.getByRole("button", { name: "Menu" }).click();
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.waitForTimeout(150);
+  await page.setViewportSize({ width: 768, height: 800 });
+  await page.waitForTimeout(150);
+  if (await page.locator("#primary-navigation").isVisible()) failures.push("menu: reopened after the window widened past 900 px and narrowed again");
+
+  // Desktop tab order: wordmark, the links left to right, then Cart.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(base + "/");
+  await page.locator("header .wordmark").focus();
+  for (const problem of await headerTabOrder(page)) failures.push(`desktop header @1280: ${problem}`);
+
+  const homeCard = {};
+  // Transactional and owner pages stay out of search and have no card of their own.
+  const privateRoutes = new Set(["/payments", "/zelle", "/checkout", "/orders", "/account"]);
   // Site identity on every route.
   for (const route of routes) {
     await page.goto(base + route);
@@ -235,12 +296,28 @@ try {
       }),
       ogUrl: document.querySelector('meta[property="og:url"]')?.getAttribute("content"),
       ogImage: document.querySelector('meta[property="og:image"]')?.getAttribute("content"),
+      ogTitle: document.querySelector('meta[property="og:title"]')?.getAttribute("content"),
+      ogDescription: document.querySelector('meta[property="og:description"]')?.getAttribute("content"),
+      robots: document.querySelector('meta[name="robots"]')?.getAttribute("content") ?? "",
+      canonical: document.querySelector('link[rel="canonical"]')?.getAttribute("href"),
     }));
     if (identity.siteName !== "Audiophile") failures.push(`${route}: og:site_name is ${identity.siteName}`);
     if (!identity.website) failures.push(`${route}: no WebSite JSON-LD with the canonical name and URL`);
-    // Only the home page may name the home URL as its og:url (one shared card for every page is LND1).
-    if (route !== "/" && (identity.ogUrl || "").replace(/\/$/, "") === "https://audiophile.royeradames.com") failures.push(`${route}: og:url points at the home page`);
-    if (identity.ogImage !== "https://audiophile.royeradames.com/og.png") failures.push(`${route}: og:image is ${identity.ogImage}`);
+    if (privateRoutes.has(route)) {
+      if (!/noindex/.test(identity.robots)) failures.push(`${route}: private page is not noindex`);
+      if (identity.canonical || identity.ogUrl) failures.push(`${route}: private page declares a canonical or og:url`);
+      continue;
+    }
+    if (/noindex/.test(identity.robots)) failures.push(`${route}: public page is noindex`);
+    if (identity.canonical?.replace(/\/$/, "") !== ("https://audiophile.royeradames.com" + route).replace(/\/$/, "")) failures.push(`${route}: canonical is ${identity.canonical}`);
+    // Every public page shares its own card: its own og:url, title and description (LND1, S1).
+    const expectedUrl = ("https://audiophile.royeradames.com" + route).replace(/\/$/, "");
+    if ((identity.ogUrl || "").replace(/\/$/, "") !== expectedUrl) failures.push(`${route}: og:url is ${identity.ogUrl}, expected ${expectedUrl}`);
+    if (!identity.ogImage?.startsWith("https://audiophile.royeradames.com/")) failures.push(`${route}: og:image is ${identity.ogImage}`);
+    if (!identity.ogTitle || !identity.ogDescription) failures.push(`${route}: share card lacks a title or description`);
+    if (route === "/") Object.assign(homeCard, { title: identity.ogTitle, description: identity.ogDescription });
+    if (route !== "/" && identity.ogTitle === homeCard.title) failures.push(`${route}: share card reuses the home title`);
+    if (route !== "/" && identity.ogDescription === homeCard.description) failures.push(`${route}: share card reuses the home description`);
   }
 } finally {
   await browser.close();

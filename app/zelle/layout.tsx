@@ -1,10 +1,12 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "../site-identity";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
+  path: "/zelle",
+  private: true,
   title: "Pay with Zelle",
   description:
     "Scan the Zelle QR, confirm the name, send the amount, and put the order ID in the memo.",
-};
+});
 
 export default function ZelleLayout({
   children,
