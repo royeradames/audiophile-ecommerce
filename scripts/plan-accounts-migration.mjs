@@ -2,12 +2,18 @@
 // reviewed @royer/auth central adapter needs, planned against an empty
 // in-memory PostgreSQL. Nothing is applied and no issuer is contacted.
 // Statements are made idempotent so a rerun never fails or drops data.
-import { writeFile } from "node:fs/promises";
+import { access, writeFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { createFederatedAuth } from "@royer/auth/federation";
 import { getMigrations } from "better-auth/db/migration";
 import pg from "pg";
+
+// 0002 is applied and recorded by its hash; it is never rewritten. Upgrades use
+// scripts/plan-auth-upgrade-migration.mjs, which writes a new file.
+if (await access(new URL("../migrations/0002_accounts.sql", import.meta.url)).then(() => true, () => false)) {
+  throw new Error("migrations/0002_accounts.sql exists; plan upgrades with scripts/plan-auth-upgrade-migration.mjs.");
+}
 
 const database = await PGlite.create();
 const server = new PGLiteSocketServer({ db: database, host: "127.0.0.1", port: 0 });
