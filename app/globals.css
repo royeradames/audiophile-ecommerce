@@ -428,11 +428,9 @@ h3 {
 }
 
 .feature-zx9 h3 {
-  /* "ZX9 / SPEAKER" on two lines, as in the design, never wider than a word. */
-  max-width: min-content;
+  /* The markup breaks "ZX9 / SPEAKER" onto two lines, as in the design. */
   margin-bottom: 24px;
   font-size: clamp(2.25rem, 4.5vw, 3.5rem);
-  overflow-wrap: break-word;
   text-transform: uppercase;
 }
 
@@ -714,6 +712,13 @@ h3 {
   border-radius: var(--radius);
 }
 
+.recommendation-grid .button {
+  /* Three narrow columns on a small tablet: keep "See product" on one line. */
+  max-width: 100%;
+  padding-inline: clamp(12px, 2.4vw, 27px);
+  white-space: nowrap;
+}
+
 .recommendation-grid h3 {
   font-size: 1.5rem;
   text-transform: uppercase;
@@ -920,7 +925,7 @@ legend {
 .form-grid {
   display: grid;
   gap: 22px;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .form-field {
@@ -936,6 +941,9 @@ legend {
 }
 
 .form-field input {
+  /* Inputs otherwise keep their default ~20ch width and push out of narrow columns. */
+  width: 100%;
+  min-width: 0;
   min-height: 58px;
   padding: 15px 18px;
   border: 1.5px solid #bcb5af;
@@ -1030,9 +1038,17 @@ legend {
 
 .instruction-list li {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+/* The label and value take the row; Copy drops below when the column is narrow. */
+.instruction-list li > span {
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .instruction-list strong {
@@ -1636,11 +1652,12 @@ legend {
   .primary-nav {
     grid-column: 1 / -1;
     order: 4;
-    margin-inline: -20px;
     display: none;
     padding: 30px 20px;
     background: #171717;
-    box-shadow: 0 20px 40px rgb(0 0 0 / 0.28);
+    /* Paint the dark band edge to edge without widening the header box. */
+    box-shadow: 0 0 0 100vmax #171717, 0 20px 40px rgb(0 0 0 / 0.28);
+    clip-path: inset(0 -100vmax -40px);
   }
 
   .primary-nav.is-open {
@@ -1806,7 +1823,6 @@ legend {
   }
 
   .primary-nav {
-    margin-inline: -16px;
     flex-direction: column;
   }
 
@@ -1967,7 +1983,7 @@ legend {
   .stack-methods,
   .stack-layout,
   .stack-banks {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .stack-intro,

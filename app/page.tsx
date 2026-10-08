@@ -42,7 +42,11 @@ export default function HomePage() {
             />
             <div>
               <p className="eyebrow eyebrow-light">Room-filling clarity</p>
-              <h3>ZX9 speaker</h3>
+              {/* The design sets ZX9 / SPEAKER on two lines at every width. */}
+              <h3>
+                ZX9 <br />
+                speaker
+              </h3>
               <p>
                 A precise active speaker system with the scale to make familiar
                 recordings feel new again.

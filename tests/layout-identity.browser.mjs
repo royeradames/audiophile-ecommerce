@@ -17,7 +17,7 @@ const routes = [
   "/speakers/zx9-speaker", "/speakers/zx7-speaker", "/earphones/yx1-earphones",
   "/payments", "/zelle", "/checkout", "/orders", "/account",
 ];
-const widths = [320, 330, 350, 400, 620, 621, 630, 650, 670, 770, 900, 901, 910, 920, 960, 1000, 1110, 1280, 1920];
+const widths = [320, 330, 350, 400, 620, 621, 630, 640, 650, 660, 670, 770, 900, 901, 910, 920, 940, 960, 1000, 1110, 1280, 1920];
 const failures = [];
 
 const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || "chrome", headless: true });
@@ -73,6 +73,26 @@ try {
           const lines = new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size;
           if (lines > words.length) out.push(`heading squeezed "${el.textContent.trim().slice(0, 30)}" (${lines} lines for ${words.length} words)`);
         }
+        // Labels and buttons keep at least 8 characters per line (squeezed cards).
+        for (const el of document.querySelectorAll("main strong, main a.button, main button, main h1, main h2, main h3")) {
+          if (!visible(el) || el.clientWidth <= 2 || el.querySelector("br")) continue;
+          const text = el.textContent.trim().replace(/\s+/g, " ");
+          if (text.split(" ").length < 2) continue;
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          const lines = new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size;
+          if (lines > 1 && text.length / lines < 8) out.push(`squeezed "${text.slice(0, 30)}" (${lines} lines)`);
+        }
+        // Fields, bank cards, payment rows and the menu stay inside their box.
+        for (const el of document.querySelectorAll(".form-field, .stack-bank, .instruction-list li > *, .recommendation-grid .button, #primary-navigation")) {
+          const parent = el.parentElement;
+          if (!visible(el) || !parent) continue;
+          const box = el.getBoundingClientRect(), outer = parent.getBoundingClientRect();
+          const style = getComputedStyle(parent);
+          const left = outer.left + parseFloat(style.paddingLeft) + parseFloat(style.borderLeftWidth);
+          const right = outer.right - parseFloat(style.paddingRight) - parseFloat(style.borderRightWidth);
+          if (box.left < left - 1 || box.right > right + 1) out.push(`spills its box: ${el.className || el.id} "${el.textContent.trim().slice(0, 24)}"`);
+        }
         // The header: wordmark, nav and cart never touch, and the desktop nav is one line.
         const parts = [".wordmark", "#primary-navigation", ".cart-button", ".menu-button"]
           .map((selector) => document.querySelector(`header ${selector}`))
@@ -111,8 +131,16 @@ try {
         const box = el.getBoundingClientRect();
         return box.height > 0 && box.top < nav.bottom - 2 && box.bottom > nav.top + 2;
       });
-      return { covered: covered.map((el) => el.textContent.trim().slice(0, 30)), bar: document.querySelector(".wordmark").getBoundingClientRect().top };
+      const inner = document.querySelector(".header-inner").getBoundingClientRect();
+      return {
+        covered: covered.map((el) => el.textContent.trim().slice(0, 30)),
+        bar: document.querySelector(".wordmark").getBoundingClientRect().top,
+        spills: nav.left < inner.left - 1 || nav.right > inner.right + 1,
+        pageScroll: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+      };
     });
+    if (state.spills) failures.push(`menu @${width}: open menu spills out of the header box`);
+    if (state.pageScroll) failures.push(`menu @${width}: open menu scrolls the page sideways`);
     if (state.covered.length) failures.push(`menu @${width} covers page text: ${state.covered.join(" | ")}`);
     if (Math.abs(state.bar - barBefore) > 1) failures.push(`menu @${width}: header bar moved ${state.bar - barBefore}px`);
     await page.getByRole("button", { name: "Close" }).click();
