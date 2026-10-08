@@ -61,6 +61,7 @@ jobs:
           done
           echo "The registered origin never served this deployment."; exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        id: checkout
         with:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -77,7 +78,7 @@ jobs:
           ACCOUNTS_PREVIEW_BYPASS: ${{ secrets.ACCOUNTS_PREVIEW_BYPASS }}
           AUTH_PREVIEW_SINK_TOKEN: ${{ secrets.AUTH_PREVIEW_SINK_TOKEN }}
       - name: Remove synthetic orders and accounts
-        if: always()
+        if: always() && steps.checkout.outcome == 'success'
         run: node scripts/cleanup-suite-data.mjs
         env:
           AUDIOPHILE_DATABASE_URL: ${{ secrets.AUDIOPHILE_DATABASE_URL }}
