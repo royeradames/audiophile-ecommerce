@@ -20,6 +20,8 @@ import {
 type OrderContextValue = {
   orders: OrderRecord[];
   addOrder: (order: OrderRecord) => void;
+  /** Adds the order, or replaces this browser's copy with the server's. */
+  saveOrder: (order: OrderRecord) => void;
   markPaid: (id: string) => void;
   markCollected: (id: string) => void;
   cancelOrder: (id: string) => void;
@@ -61,6 +63,14 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const saveOrder = useCallback((order: OrderRecord) => {
+    setOrders((current) => {
+      const next = [order, ...current.filter((item) => item.id !== order.id)];
+      writeStoredOrders(next);
+      return next;
+    });
+  }, []);
+
   const markPaid = useCallback((id: string) => {
     const settledAt = new Date().toISOString();
     setOrders((current) => {
@@ -91,11 +101,12 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     () => ({
       orders,
       addOrder,
+      saveOrder,
       markPaid,
       markCollected,
       cancelOrder,
     }),
-    [orders, addOrder, markPaid, markCollected, cancelOrder],
+    [orders, addOrder, saveOrder, markPaid, markCollected, cancelOrder],
   );
 
   return <OrderContext.Provider value={value}>{children}</OrderContext.Provider>;

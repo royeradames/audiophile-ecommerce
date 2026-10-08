@@ -13,6 +13,7 @@ const navigation = [
   { href: "/headphones", label: "Headphones" },
   { href: "/speakers", label: "Speakers" },
   { href: "/earphones", label: "Earphones" },
+  { href: "/account", label: "Account" },
 ];
 
 export function SiteShell({ children }: { children: React.ReactNode }) {

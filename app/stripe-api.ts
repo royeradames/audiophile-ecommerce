@@ -34,6 +34,8 @@ export async function createStripeCheckoutSession(input: {
   email: string;
   origin: string;
   description: string;
+  /** Stripe returns the same session for a repeated key instead of creating another. */
+  idempotencyKey?: string;
 }) {
   const params = new URLSearchParams();
   params.set("mode", "payment");
@@ -52,7 +54,10 @@ export async function createStripeCheckoutSession(input: {
 
   return stripeRequest("checkout/sessions", {
     method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      ...(input.idempotencyKey ? { "idempotency-key": input.idempotencyKey } : {}),
+    },
     body: params,
   });
 }
@@ -73,6 +78,8 @@ export async function createStripePaymentIntent(input: {
   orderId: string;
   amountCents: number;
   email: string;
+  /** Stripe returns the same intent for a repeated key instead of creating another. */
+  idempotencyKey?: string;
 }) {
   const params = new URLSearchParams();
   params.set("amount", String(input.amountCents));
@@ -84,7 +91,15 @@ export async function createStripePaymentIntent(input: {
 
   return stripeRequest("payment_intents", {
     method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      ...(input.idempotencyKey ? { "idempotency-key": input.idempotencyKey } : {}),
+    },
     body: params,
   });
+}
+
+/** Closes an open hosted Checkout page so it can no longer take payment. */
+export async function expireStripeCheckoutSession(sessionId: string) {
+  return stripeRequest(`checkout/sessions/${encodeURIComponent(sessionId)}/expire`, { method: "POST" });
 }

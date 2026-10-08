@@ -2,106 +2,206 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { CardPayment } from "../../card-payment";
 import { formatUsd } from "../../checkout-totals";
+import type { OrderSummary } from "../../order-api";
 import { useOrders } from "../../order-context";
+import { orderStatusLabels } from "../../order-record";
+import { OrderSummaryCard } from "../../order-summary-card";
 import { startHostedCheckout } from "../../stripe-client";
-import { useState } from "react";
+import { fetchServerOrder, fetchStoreFeatures } from "../../store-client";
 
 export default function CheckoutPayPage() {
   return (
-    <Suspense fallback={<PayBody message="Loading the pending order…" />}>
+    <Suspense fallback={<PayBody message="Loading the order…" />}>
       <CheckoutPayClient />
     </Suspense>
   );
 }
 
+type ServerOrder =
+  | { state: "loading" }
+  | { state: "browser_only" }
+  | { state: "found"; order: OrderSummary }
+  | { state: "missing" }
+  | { state: "error"; error: string };
+
 function CheckoutPayClient() {
   const params = useSearchParams();
   const orderId = params.get("order");
   const { orders, markPaid } = useOrders();
+  const [server, setServer] = useState<ServerOrder>({ state: "loading" });
   const [error, setError] = useState<string | null>(null);
   const [paid, setPaid] = useState(false);
-  const order = orders.find((item) => item.id === orderId);
+  const [confirming, setConfirming] = useState(false);
+  const [email, setEmail] = useState("");
+  // The card form starts only after the shopper confirms the email, so typing
+  // does not send a payment request per keystroke.
+  const [payerEmail, setPayerEmail] = useState<string | null>(null);
+  const [opening, setOpening] = useState(false);
+  const local = orders.find((item) => item.id === orderId);
 
+  useEffect(() => {
+    if (!orderId) return;
+    let cancelled = false;
+    void (async () => {
+      let features;
+      try {
+        features = await fetchStoreFeatures();
+      } catch {
+        if (!cancelled) setServer({ state: "error", error: "The store could not be reached. Try again in a moment." });
+        return;
+      }
+      if (!features.durableOrders) {
+        if (!cancelled) setServer({ state: "browser_only" });
+        return;
+      }
+      const result = await fetchServerOrder(orderId);
+      if (cancelled) return;
+      if (result.ok) setServer({ state: "found", order: result.order });
+      else setServer(result.missing ? { state: "missing" } : { state: "error", error: result.error });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [orderId, paid, confirming]);
+
+  // The server is authoritative; bring this browser's copy up to date.
+  const serverStatus = server.state === "found" ? server.order.status : null;
+  useEffect(() => {
+    if (serverStatus === "paid" && local && local.status !== "paid") markPaid(local.id);
+  }, [serverStatus, local, markPaid]);
+
+  const lines = server.state === "found" ? server.order.lines : local?.lines;
+  const items = useMemo(
+    () => (lines ?? []).map((line) => ({ productId: line.productId, quantity: line.quantity })),
+    [lines],
+  );
+
+  if (!orderId) return <PayBody message="Open an order from its confirmation link or your account." />;
+  if (server.state === "loading") return <PayBody message="Loading the order…" />;
+  if (server.state === "error") return <PayBody message={server.error} />;
+
+  const order: OrderSummary | null = server.state === "found"
+    ? server.order
+    : local
+      ? { ...local, savedToAccount: false }
+      : null;
   if (!order) {
     return (
       <PayBody
-        message="That order is not in this browser. Place it again from checkout, or open pending orders on the same device."
+        message={server.state === "missing"
+          ? "No order has that ID. Check the link from your confirmation, or place the order again from checkout."
+          : "That order is not in this browser. Place it again from checkout, or open pending orders on the same device."}
       />
     );
   }
 
-  if (order.status !== "pending_hosted") {
-    return (
-      <PayBody
-        message={`Order ${order.id} is ${order.status}. Card retry is only for pending card orders.`}
-        orderId={order.id}
-      />
-    );
-  }
+  const payer = local?.customer.email ?? payerEmail;
+  const canPay = order.status === "pending_hosted" && !paid && !confirming;
 
   return (
     <section className="stack-page section" aria-labelledby="pay-title">
       <div className="container">
-        <p className="overline overline-accent">Stripe test</p>
+        <p className="overline overline-accent">{server.state === "found" ? "Saved order" : "This browser"}</p>
         <div className="stack-intro">
           <div>
-            <h1 id="pay-title">Pay {order.id}</h1>
+            <h1 id="pay-title">Order {order.id}</h1>
             <p>
-              {formatUsd(order.grandTotal)} USD. Test mode only. Card numbers stay on Stripe.
+              {paid
+                ? "Stripe test payment recorded. This is not a live merchant charge."
+                : confirming
+                  ? "Stripe accepted the test payment. The store is still confirming it; reload this page in a moment."
+                  : `${orderStatusLabels[order.status]} · ${formatUsd(order.grandTotal)} USD.`}
+              {canPay ? " Test mode only. Card numbers stay on Stripe." : null}
             </p>
-            {paid ? <p>Stripe test payment recorded. This is not a live merchant charge.</p> : null}
-            {error ? <p className="stack-hint">{error}</p> : null}
+            {error ? <p className="stack-hint" role="alert">{error}</p> : null}
           </div>
-          <Link className="button button-outline" href="/orders">
-            Pending orders
+          <Link className="button button-outline" href={order.savedToAccount ? "/account" : "/"}>
+            {order.savedToAccount ? "Your account" : "Back to home"}
           </Link>
         </div>
-        {paid ? null : order.payment === "element" ? (
-          <CardPayment
-            orderId={order.id}
-            items={order.lines}
-            email={order.customer.email}
-            onPaid={() => {
-              markPaid(order.id);
-              setPaid(true);
-            }}
-          />
-        ) : (
-          <button
-            className="button button-primary"
-            type="button"
-            onClick={async () => {
-              const result = await startHostedCheckout({
-                orderId: order.id,
-                items: order.lines,
-                email: order.customer.email,
-              });
-              if (result.ok) {
-                window.location.assign(result.url);
-                return;
-              }
-              setError(result.error);
+
+        <OrderSummaryCard order={paid ? { ...order, status: "paid" } : order} headingLevel={2} />
+
+        {canPay && !payer ? (
+          <form
+            className="pay-email"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (email.trim()) setPayerEmail(email.trim());
             }}
           >
-            Open Stripe test Checkout
-          </button>
-        )}
+            <label className="form-field" htmlFor="pay-email">
+              <span>Email used at checkout</span>
+              <input
+                id="pay-email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </label>
+            <button className="button button-primary" type="submit">Continue to payment</button>
+          </form>
+        ) : null}
+
+        {canPay && payer ? (
+          <div className="pay-actions">
+            {!local ? (
+              <button className="text-button" type="button" onClick={() => setPayerEmail(null)}>
+                Use a different email
+              </button>
+            ) : null}
+            {order.payment === "element" ? (
+              <CardPayment
+                orderId={order.id}
+                items={items}
+                email={payer}
+                onPaid={(recorded) => {
+                  if (recorded && local) markPaid(order.id);
+                  if (recorded) setPaid(true);
+                  else setConfirming(true);
+                }}
+              />
+            ) : (
+              <button
+                className="button button-primary"
+                type="button"
+                aria-busy={opening}
+                onClick={async () => {
+                  if (opening) return;
+                  setOpening(true);
+                  setError(null);
+                  const result = await startHostedCheckout({ orderId: order.id, items, email: payer });
+                  if (result.ok) {
+                    window.location.assign(result.url);
+                    return;
+                  }
+                  setOpening(false);
+                  setError(result.error);
+                }}
+              >
+                {opening ? "Opening Stripe…" : "Open Stripe test Checkout"}
+              </button>
+            )}
+          </div>
+        ) : null}
       </div>
     </section>
   );
 }
 
-function PayBody({ message, orderId }: { message: string; orderId?: string }) {
+function PayBody({ message }: { message: string }) {
   return (
-    <section className="stack-page section">
+    <section className="stack-page section" aria-labelledby="pay-title">
       <div className="container">
-        <h1>{orderId ?? "Pay"}</h1>
-        <p>{message}</p>
-        <Link className="button button-outline" href="/orders">
-          Pending orders
+        <h1 id="pay-title">Order</h1>
+        <p role="status">{message}</p>
+        <Link className="button button-outline" href="/account">
+          Your orders
         </Link>
       </div>
     </section>

@@ -167,3 +167,17 @@ test("checkout reserves its form while the browser restores its cart", async () 
   assert.match(html, /<fieldset disabled/);
   assert.doesNotMatch(html, /Your cart is empty/);
 });
+
+test("the Sites fallback stays guest-only", async () => {
+  const features = await render("/api/store/features");
+  assert.deepEqual(await features.json(), { durableOrders: false, accounts: "coming_soon" });
+  const account = await render("/account");
+  assert.equal(account.status, 200);
+  const { readdir } = await import("node:fs/promises");
+  const directory = new URL("../dist/server/", import.meta.url);
+  const files = (await readdir(directory, { recursive: true })).filter((name) => name.endsWith(".js"));
+  for (const name of files) {
+    const source = await readFile(new URL(name, directory), "utf8");
+    assert.doesNotMatch(source, /createFederatedAuth|pg-pool|attachDatabasePool/, `${name} must not bundle the database or accounts`);
+  }
+});

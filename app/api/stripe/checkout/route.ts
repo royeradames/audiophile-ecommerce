@@ -2,6 +2,8 @@ import { createStripeCheckoutSession } from "../../../stripe-api";
 import { stripePublicConfig } from "../../../stripe-env";
 import { requestOrigin } from "../../../request-origin";
 import { readPaymentRequest } from "../../../payment-request";
+import { hostedCheckoutFor, payableOrder } from "../../../server/payments";
+import { serverRuntime } from "../../../server/runtime";
 
 export async function POST(request: Request) {
   const config = stripePublicConfig();
@@ -18,6 +20,22 @@ export async function POST(request: Request) {
   const payment = await readPaymentRequest(request);
   if (!payment.ok) {
     return Response.json({ error: payment.error }, { status: payment.status });
+  }
+
+  const runtime = serverRuntime();
+  if (runtime) {
+    try {
+      const payable = await payableOrder(runtime.db, payment, "hosted");
+      if (!payable.ok) return Response.json({ error: payable.error }, { status: payable.status });
+      const hosted = await hostedCheckoutFor(runtime.db, payable.order, {
+        origin: requestOrigin(request),
+        description: payment.description,
+      });
+      if (!hosted.ok) return Response.json({ error: hosted.error }, { status: hosted.status });
+      return Response.json({ url: hosted.url });
+    } catch {
+      return Response.json({ error: "Could not start Stripe test Checkout. Please try again." }, { status: 502 });
+    }
   }
 
   try {

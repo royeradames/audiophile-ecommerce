@@ -1,6 +1,9 @@
 import { retrieveStripeCheckoutSession } from "../../../stripe-api";
 import { recordPaidOrder } from "../../../paid-ledger";
 import { stripePublicConfig } from "../../../stripe-env";
+import { paymentFromCheckoutSession } from "../../../stripe-webhook";
+import { recordPayment, settledPaid } from "../../../server/payments";
+import { serverRuntime } from "../../../server/runtime";
 
 export async function GET(request: Request) {
   const config = stripePublicConfig();
@@ -21,8 +24,15 @@ export async function GET(request: Request) {
     const paymentStatus = typeof session.payment_status === "string" ? session.payment_status : "";
     const orderId =
       typeof session.client_reference_id === "string" ? session.client_reference_id : null;
-    const paid = paymentStatus === "paid";
-    if (paid && orderId) {
+    let paid = paymentStatus === "paid";
+    const runtime = serverRuntime();
+    const reported = paymentFromCheckoutSession(session);
+    if (runtime && reported) {
+      // Retrieved from Stripe with the server key, so the status is trusted.
+      paid = settledPaid(await recordPayment(runtime.db, reported));
+    } else if (runtime) {
+      paid = false;
+    } else if (paid && orderId) {
       recordPaidOrder(orderId, "checkout.session");
     }
     return Response.json({

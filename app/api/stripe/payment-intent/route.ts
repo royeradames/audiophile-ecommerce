@@ -2,6 +2,9 @@ import { createStripePaymentIntent, retrieveStripePaymentIntent } from "../../..
 import { recordPaidOrder } from "../../../paid-ledger";
 import { stripePublicConfig } from "../../../stripe-env";
 import { readPaymentRequest } from "../../../payment-request";
+import { intentStatus, paymentFromIntent } from "../../../stripe-webhook";
+import { cardIntentFor, payableOrder, recordPayment, settledPaid } from "../../../server/payments";
+import { serverRuntime } from "../../../server/runtime";
 
 export async function GET(request: Request) {
   const config = stripePublicConfig();
@@ -22,14 +25,21 @@ export async function GET(request: Request) {
     if (intent.livemode === true) {
       return Response.json({ error: "Live Stripe objects are blocked." }, { status: 400 });
     }
-    const status = typeof intent.status === "string" ? intent.status : "";
+    const status = intentStatus(intent.status) ?? "";
     const metadata = intent.metadata && typeof intent.metadata === "object" ? intent.metadata : null;
     const orderId =
       metadata && "order_id" in metadata && typeof metadata.order_id === "string"
         ? metadata.order_id
         : null;
-    const paid = status === "succeeded";
-    if (paid && orderId) {
+    let paid = status === "succeeded";
+    const runtime = serverRuntime();
+    const reported = paymentFromIntent(intent);
+    if (runtime && reported) {
+      // Retrieved from Stripe with the server key, so the status is trusted.
+      paid = settledPaid(await recordPayment(runtime.db, reported));
+    } else if (runtime) {
+      paid = false;
+    } else if (paid && orderId) {
       recordPaidOrder(orderId, "payment_intent");
     }
     return Response.json({
@@ -60,6 +70,19 @@ export async function POST(request: Request) {
   const payment = await readPaymentRequest(request);
   if (!payment.ok) {
     return Response.json({ error: payment.error }, { status: payment.status });
+  }
+
+  const runtime = serverRuntime();
+  if (runtime) {
+    try {
+      const payable = await payableOrder(runtime.db, payment, "element");
+      if (!payable.ok) return Response.json({ error: payable.error }, { status: payable.status });
+      const intent = await cardIntentFor(runtime.db, payable.order);
+      if (!intent.ok) return Response.json({ error: intent.error }, { status: intent.status });
+      return Response.json({ clientSecret: intent.clientSecret, amount: payable.order.grandTotal });
+    } catch {
+      return Response.json({ error: "Could not start the Stripe test card form. Please try again." }, { status: 502 });
+    }
   }
 
   try {

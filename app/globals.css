@@ -1985,3 +1985,52 @@ legend {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Customer accounts and saved orders */
+.checkout-intro .account-note {
+  margin: 14px 0 0;
+  max-width: 62ch;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.pay-email {
+  max-width: 420px;
+  margin-top: 28px;
+}
+
+.pay-actions {
+  margin-top: 28px;
+  max-width: 560px;
+}
+
+.order-list > li {
+  min-width: 0;
+}
+
+@media (max-width: 620px) {
+  .order-card-head-link {
+    flex-direction: column;
+  }
+
+  .order-card-head-link .button {
+    width: 100%;
+  }
+}
+
+.order-card h2 {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.refund-notice {
+  margin-bottom: 24px;
+}
+
+.pay-email {
+  display: grid;
+  gap: 16px;
+  justify-items: start;
+}
