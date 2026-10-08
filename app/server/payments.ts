@@ -2,6 +2,7 @@ import type pg from "pg";
 import type { PaymentMethod } from "../payment-methods";
 import type { PaymentRequest } from "../payment-request";
 import {
+  cancelStripePaymentIntent,
   createStripeCheckoutSession,
   createStripePaymentIntent,
   expireStripeCheckoutSession,
@@ -10,11 +11,14 @@ import {
 } from "../stripe-api";
 import { intentStatus, paymentFromCheckoutSession, paymentFromIntent, type ReportedPayment } from "../stripe-webhook";
 import {
+  abandonedOrderAttempts,
+  abandonedOrderSessions,
   checkoutSessionsFor,
   countAttempts,
   getOrder,
   inTransaction,
   openAttempts,
+  purgeAbandonedOrders,
   recordCheckoutSession,
   settleStripePayment,
   type SettleOutcome,
@@ -50,7 +54,7 @@ export async function payableOrder(
   if (!order) return { ok: false, status: 404, error: "No order has that ID. Place the order again from checkout." };
   const sameItems = request.items.length === order.lines.length &&
     request.items.every((item) => order.lines.some((line) => line.productId === item.productId && line.quantity === item.quantity));
-  if (order.email.toLowerCase() !== request.email.toLowerCase() || !sameItems) {
+  if (!sameItems) {
     return { ok: false, status: 409, error: "These details do not match the saved order. Reload the order and try again." };
   }
   if (order.status !== "pending_hosted") {
@@ -100,7 +104,6 @@ export async function cardIntentFor(db: pg.Pool, order: StoredOrder): Promise<{ 
   const intent = await createStripePaymentIntent({
     orderId: order.id,
     amountCents: order.totalCents,
-    email: order.email,
     idempotencyKey: `audiophile:${order.id}:intent:${attempt}`,
   });
   if (typeof intent.id !== "string" || typeof intent.client_secret !== "string" || intent.livemode === true) {
@@ -142,7 +145,6 @@ export async function hostedCheckoutFor(
   const session = await createStripeCheckoutSession({
     orderId: order.id,
     amountCents: order.totalCents,
-    email: order.email,
     origin: input.origin,
     description: input.description,
     // Simultaneous requests (two tabs, a double click) get the same page.
@@ -153,4 +155,40 @@ export async function hostedCheckoutFor(
   }
   await recordCheckoutSession(db, order.id, session.id);
   return { ok: true, url: session.url };
+}
+
+/**
+ * The daily purge: cancel abandoned orders' open card attempts at Stripe
+ * (recording whatever Stripe reports, in case one was paid meanwhile), then
+ * delete the orders that hold no money.
+ */
+export async function purgeAbandoned(db: pg.Pool) {
+  let cancelledAttempts = 0;
+  for (const intentId of await abandonedOrderAttempts(db)) {
+    let intent: Record<string, unknown>;
+    try {
+      intent = await cancelStripePaymentIntent(intentId);
+      cancelledAttempts += 1;
+    } catch {
+      // Already paid, processing or gone: record what Stripe says instead.
+      intent = await retrieveStripePaymentIntent(intentId).catch(() => ({}));
+    }
+    const reported = paymentFromIntent(intent);
+    if (reported) await recordPayment(db, reported);
+  }
+  // Hosted pages stay payable for 24 hours: close recent ones, and record a
+  // page that was paid meanwhile so its order is kept.
+  let expiredPages = 0;
+  for (const sessionId of await abandonedOrderSessions(db)) {
+    const session: Record<string, unknown> = await expireStripeCheckoutSession(sessionId)
+      .then((expired) => { expiredPages += 1; return expired; })
+      .catch(() => retrieveStripeCheckoutSession(sessionId).catch(() => ({})));
+    const reported = paymentFromCheckoutSession(session);
+    if (reported) await recordPayment(db, reported);
+    else if (session.status !== "expired") {
+      // Stripe could not confirm the page is closed: keep everything for tomorrow.
+      return { cancelledAttempts, expiredPages, purgedOrders: 0, purgedRateLimitWindows: 0, deferred: true };
+    }
+  }
+  return { cancelledAttempts, expiredPages, ...await purgeAbandonedOrders(db) };
 }

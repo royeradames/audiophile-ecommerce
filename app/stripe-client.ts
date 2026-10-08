@@ -13,7 +13,7 @@ export async function fetchStripeConfig(): Promise<StripePublicConfig> {
 function paymentBody(input: PaymentRequest) {
   return JSON.stringify({
     orderId: input.orderId,
-    email: input.email,
+    // The email stays in the browser: the demo store never sends it.
     items: input.items.map(({ productId, quantity }) => ({ productId, quantity })),
   });
 }

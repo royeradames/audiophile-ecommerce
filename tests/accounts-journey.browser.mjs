@@ -99,7 +99,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   const features = await (await fetch(`http://127.0.0.1:${ports.app}/api/store/features`)).json();
-  assert.deepEqual(features, { durableOrders: true, accounts: "enabled" });
+  assert.deepEqual(features, { demo: true, durableOrders: true, accounts: "enabled" });
   if (process.env.JOURNEY_PROBE) {
     const probe = await new Promise((resolve, reject) => {
       const req = httpRequest({ host: "127.0.0.1", port: ports.app, method: "POST", path: "/api/auth/federation/start",
@@ -202,7 +202,9 @@ try {
   const bob = await open(browsers.second, "third context");
   await signIn(bob, people.bob);
   await bob.page.getByRole("heading", { name: "No orders yet" }).waitFor();
+  // Regression (Preview, October 8): a signed-in account with no orders got a 503.
   const bobHistory = await bob.page.request.get(`${SHOP}/api/account/orders`);
+  assert.equal(bobHistory.status(), 200);
   assert.deepEqual((await bobHistory.json()).orders, []);
   log("Bob's history is empty; Alice's order stays hers.");
 

@@ -1,9 +1,9 @@
 import { expect, test, type Browser } from "@playwright/test";
 import { randomBytes } from "node:crypto";
-import { authorizePreviews, payWithTestCard, shopOrigin } from "./hosted-env";
+import { authorizePreviews, payWithTestCard, rememberOrder, shopOrigin } from "./hosted-env";
 
-// Fictional buyer. Every address starts with "suite-" at the reserved
-// example.test domain so cleanup can find and remove these orders.
+// Fictional buyer. The store never receives these details; the suite records
+// the order IDs it creates so cleanup can remove them.
 const run = Date.now().toString(36) + randomBytes(3).toString("hex");
 const buyer = {
   name: "Suite Buyer", email: `suite-${run}@example.test`, phone: "+1 202 555 0148",
@@ -34,6 +34,7 @@ test("a guest order is saved before payment, paid once with a Stripe test card, 
   const createdResponse = await created;
   expect(createdResponse.status()).toBe(201);
   const { order } = await createdResponse.json();
+  rememberOrder(order.id);
   expect(order.grandTotal, "Server total: $2,999 + $50 demo shipping + $540 demo ITBIS 18%").toBe(3589);
   await expect(page.getByRole("heading", { name: `Order ${order.id}`, exact: true })).toBeVisible();
   const intentId = String((await (await firstIntent).json()).clientSecret).split("_secret_")[0];

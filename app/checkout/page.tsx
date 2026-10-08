@@ -26,6 +26,7 @@ import {
 import { usePayeeSettings } from "../payee-context";
 import { startHostedCheckout } from "../stripe-client";
 import { createServerOrder, fetchCustomer, fetchStoreFeatures } from "../store-client";
+import { sampleCheckoutDetails } from "../demo-store";
 import type { PaymentRequest } from "../payment-request";
 
 const fieldOrder = [
@@ -311,7 +312,6 @@ export default function CheckoutPage() {
           requestKey: submission.current.key,
           payment: value.payment,
           pickupCity,
-          customer,
           items: cart,
         });
         setSaving(false);
@@ -434,11 +434,33 @@ export default function CheckoutPage() {
                 a dedicated AZUL terminal in the Dominican Republic. Payee
                 details come from the <Link href="/payments">payment stack</Link>.
               </p>
-              {features?.durableOrders ? (
-                <p className="account-note">
-                  Use fictional details: this demo store saves orders on its server so their links work in any browser.
+              <div className="demo-checkout-note" role="note" aria-label="Demo store">
+                <p>
+                  <strong>Demo store:</strong> nothing is sold, charged or shipped. Test the whole
+                  flow with fictional details and Stripe&apos;s test card.
                 </p>
-              ) : null}
+                <p>
+                  The store saves the order and its total only. Your name, email, phone and
+                  address stay in this browser; the store doesn&apos;t save them. Stripe&apos;s test
+                  page may ask for an email and a name: use fictional ones.
+                </p>
+                <p>
+                  To stop abuse, the store sets an anonymous session cookie and keeps a keyed
+                  fingerprint of your connection for up to two days. Orders never paid are
+                  deleted after 7 days.
+                </p>
+                <button
+                  className="button button-outline"
+                  type="button"
+                  onClick={() => {
+                    for (const [name, value] of Object.entries(sampleCheckoutDetails)) {
+                      form.setFieldValue(name as keyof typeof sampleCheckoutDetails, value);
+                    }
+                  }}
+                >
+                  Fill sample details
+                </button>
+              </div>
               <AccountNotice account={account} />
               {canceled ? (
                 <CanceledCheckoutNotice order={returnedOrder} />

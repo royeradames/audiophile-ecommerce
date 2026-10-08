@@ -1,6 +1,6 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { randomBytes } from "node:crypto";
-import { accountsConfigured, accountsOrigin, authorizePreviews, readSink, shopOrigin } from "./hosted-env";
+import { accountsConfigured, accountsOrigin, authorizePreviews, readSink, rememberOrder, shopOrigin } from "./hosted-env";
 
 // Synthetic Breakthrough accounts. Reserved .test recipients go to the
 // issuer's preview sink, never to a real inbox. Every address starts with
@@ -28,7 +28,8 @@ async function verificationLink(email: string) {
     const response = await readSink(email);
     if (response.status !== 200) return false;
     const { messages } = await response.json() as { messages: Array<{ subject: string; text: string }> };
-    link = /https:\/\/\S+/.exec(messages.find((item) => item.subject === "Verify your Breakthrough account")?.text ?? "")?.[0] ?? "";
+    const message = messages.find((item) => /verify/i.test(item.subject));
+    link = /https:\/\/[^\s"<>]+/.exec(message?.text ?? "")?.[0] ?? "";
     return Boolean(link);
   }, { message: "Waiting for the verification message", timeout: 30_000 }).toBe(true);
   expect(new URL(link).origin, "Mail links stay on the issuer").toBe(accountsOrigin);
@@ -41,10 +42,17 @@ async function createCentralAccount(page: Page, account: Person) {
   await page.getByLabel("Username", { exact: true }).fill(account.username);
   await page.getByLabel("Email", { exact: true }).fill(account.email);
   await page.locator("input").and(page.getByLabel("Password", { exact: true })).fill(account.password);
+  // royer-auth #10: every new-password form has a confirmation field.
+  await page.getByLabel("Confirm password", { exact: true }).fill(account.password);
+  // Live requirements: the long synthetic phrase meets every rule.
+  const rules = page.getByRole("list", { name: "Password requirements" });
+  await expect(rules.getByRole("listitem").first()).toContainText("met");
+  await expect(rules.getByRole("listitem").filter({ hasText: /not met/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Create account", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
   await page.goto(await verificationLink(account.email));
-  await expect(page).toHaveURL(/\/login/);
+  // royer-auth #11: the link lands on a readable "verified" page.
+  await expect(page.getByRole("heading", { name: "Your email is verified." })).toBeVisible();
 }
 
 /** Starts on Audiophile's account page and signs in on the issuer's own screen. */
@@ -67,6 +75,10 @@ test("a Breakthrough account keeps its Audiophile order history across browsers"
   await createCentralAccount(page, owner);
   await signIn(page, owner);
   await expect(page.getByRole("heading", { name: "No orders yet" })).toBeVisible();
+  // Regression (Preview, October 8): a signed-in account with no orders got a 503.
+  const empty = await page.request.get(shopOrigin + "/api/account/orders");
+  expect(empty.status()).toBe(200);
+  expect((await empty.json()).orders).toEqual([]);
 
   await page.goto(shopOrigin + "/headphones/xx99-mark-two-headphones");
   await page.getByRole("button", { name: "Add to cart", exact: true }).click();
@@ -78,6 +90,7 @@ test("a Breakthrough account keeps its Audiophile order history across browsers"
   const created = page.waitForResponse((r) => r.url() === shopOrigin + "/api/orders" && r.request().method() === "POST");
   await page.getByRole("button", { name: "Place order", exact: true }).click();
   const { order } = await (await created).json();
+  rememberOrder(order.id);
   expect(order.savedToAccount).toBe(true);
   await expect(page.getByText("Saved to your account. Find it under Account in any browser.")).toBeVisible();
 

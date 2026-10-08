@@ -4,6 +4,7 @@ import { z } from "zod";
 import { orderSummarySchema, type NewOrder, type OrderSummary, type StoreFeatures } from "./order-api";
 
 const featuresSchema = z.object({
+  demo: z.boolean(),
   durableOrders: z.boolean(),
   accounts: z.enum(["enabled", "coming_soon"]),
 });

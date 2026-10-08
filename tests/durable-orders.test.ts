@@ -47,7 +47,7 @@ function json(url: string, body: unknown) {
 
 async function placeOrder(overrides: Record<string, unknown> = {}) {
   const response = await ordersRoute.POST(json("http://localhost/api/orders", {
-    requestKey: crypto.randomUUID(), payment: "element", pickupCity: "", customer, items: cart, ...overrides,
+    requestKey: crypto.randomUUID(), payment: "element", pickupCity: "", items: cart, ...overrides,
   }));
   return { status: response.status, body: await response.json() };
 }
@@ -66,7 +66,7 @@ function intentEvent(eventId: string, orderId: string, overrides: Record<string,
 test("the store reports durable orders when a database is configured", async (t) => {
   await withDatabase(t);
   const response = await featuresRoute.GET();
-  assert.deepEqual(await response.json(), { durableOrders: true, accounts: "coming_soon" });
+  assert.deepEqual(await response.json(), { demo: true, durableOrders: true, accounts: "coming_soon" });
 });
 
 test("an order is created from server prices, ignoring any browser total", async (t) => {
@@ -252,7 +252,7 @@ test("a broken account setting keeps checkout working and shows accounts as comi
     AUTH_BASE_URL: "https://shop.example", AUTH_SECRET: "too-short", AUTH_ISSUER_URL: "https://issuer.example/api/auth/",
     AUTH_CLIENT_ID: "synthetic", AUTH_CLIENT_SECRET: "synthetic",
   });
-  assert.deepEqual(await (await featuresRoute.GET()).json(), { durableOrders: true, accounts: "coming_soon" });
+  assert.deepEqual(await (await featuresRoute.GET()).json(), { demo: true, durableOrders: true, accounts: "coming_soon" });
   assert.equal((await placeOrder()).status, 201);
 });
 
@@ -321,7 +321,7 @@ test("a customer's history holds only their own orders", async (t) => {
     ('user-a', 'A', 'a@example.test', true), ('user-b', 'B', 'b@example.test', true)`);
   const pool = (await import("../app/server/database.ts")).getDatabase();
   assert.ok(pool);
-  const input = { requestKey: crypto.randomUUID(), payment: "transfer" as const, pickupCity: "" as const, customer, items: cart };
+  const input = { requestKey: crypto.randomUUID(), payment: "transfer" as const, pickupCity: "" as const, items: cart };
   const mine = await store.createOrder(pool, input, "user-a");
   await store.createOrder(pool, { ...input, requestKey: crypto.randomUUID() }, "user-b");
   await store.createOrder(pool, { ...input, requestKey: crypto.randomUUID() }, null);

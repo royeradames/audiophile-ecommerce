@@ -59,12 +59,12 @@ for (const endpoint of endpoints) {
   });
 }
 
-test("browser payment clients send only product identities and quantities", async (t) => {
+test("browser payment clients send only the order ID and product quantities, never the email", async (t) => {
   const { startHostedCheckout, createPaymentIntent } = await import("../app/stripe-client.ts");
   const clientInput = { ...requestBody, amount: 1, description: "forged", items: [{ ...requestBody.items[0], unitPrice: 1 }] };
   t.mock.method(globalThis, "fetch", async (_url: string, init: RequestInit) => {
     assert.equal(typeof init.body, "string");
-    assert.deepEqual(JSON.parse(String(init.body)), requestBody);
+    assert.deepEqual(JSON.parse(String(init.body)), { orderId: requestBody.orderId, items: requestBody.items });
     return Response.json({ url: "https://checkout.stripe.com/synthetic", clientSecret: "synthetic_secret", amount: 3589 });
   });
   assert.equal((await startHostedCheckout(clientInput)).ok, true);

@@ -170,7 +170,7 @@ test("checkout reserves its form while the browser restores its cart", async () 
 
 test("the Sites fallback stays guest-only", async () => {
   const features = await render("/api/store/features");
-  assert.deepEqual(await features.json(), { durableOrders: false, accounts: "coming_soon" });
+  assert.deepEqual(await features.json(), { demo: true, durableOrders: false, accounts: "coming_soon" });
   const account = await render("/account");
   assert.equal(account.status, 200);
   const { readdir } = await import("node:fs/promises");
@@ -180,4 +180,15 @@ test("the Sites fallback stays guest-only", async () => {
     const source = await readFile(new URL(name, directory), "utf8");
     assert.doesNotMatch(source, /createFederatedAuth|pg-pool|attachDatabasePool/, `${name} must not bundle the database or accounts`);
   }
+});
+
+test("every page says this is a demo store, and checkout offers sample details", async () => {
+  for (const pathname of ["/", "/checkout", "/headphones/xx99-mark-two-headphones"]) {
+    const html = await (await render(pathname)).text();
+    assert.match(html, /Demo store/, `${pathname} shows the demo notice`);
+    assert.match(html, /nothing is sold, charged or shipped/i, `${pathname} says nothing is real`);
+  }
+  const checkout = await (await render("/checkout")).text();
+  assert.match(checkout, /Fill sample details/);
+  assert.match(checkout, /name, email, phone and address stay in this browser/i, "Checkout says what the server keeps");
 });

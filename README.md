@@ -4,6 +4,10 @@ Responsive portfolio storefront experiment adapted from Frontend Mentor's Audiop
 
 ## Product boundary
 
+**Demo store (Royer, October 8, 2026).** Nothing is sold, charged for real or shipped. Every page says so, Stripe runs in test mode only and live (or restricted live) keys are refused, checkout offers **Fill sample details**, and card payment shows Stripe's test card. The store never receives name, email, phone or address: checkout validates them in the browser and keeps them there. The server keeps orders, items, totals and payment status only. Orders never paid are deleted after 7 days by a daily Vercel Cron (`/api/cron/purge-orders`, which first cancels their open card attempts at Stripe and keeps any order whose payment could hold money). Order creation and payment starts are rate limited per client address (IPv6 per /64) and per anonymous browser session, stored as HMAC buckets for up to two days.
+
+Production settings: `CRON_SECRET` (Vercel sends it to the cron; without it the purge refuses to run) and `RATE_LIMIT_SECRET` (keys the rate-limit hashes). Cron runs only on Production, so the Preview/Development database is not purged. Dropped columns stay in Neon's point-in-time history until its retention window passes.
+
 - Six fictional audio products across headphones, speakers, and earphones.
 - The cart and payee mocks persist in the current browser. On Vercel, orders are created on the server from catalog prices before any payment and stored in PostgreSQL (Neon); the owner-only Sites fallback stays guest-only and keeps orders in the browser.
 - Customer accounts use the central Breakthrough account (`@royer/auth` 0.1.0-rc.4, central mode). They are on only where the issuer registered the deployment, today the protected Preview; production says "accounts coming soon". Guest checkout always works.
@@ -47,6 +51,8 @@ Migrations live in `migrations/`, are idempotent, and are recorded with their SH
 npm run db:plan
 vercel env run -e preview -- node scripts/migrate.mjs --neon-project=<NEON_PROJECT_ID> --reviewed-sha256=<combined hash>
 ```
+
+Expand/contract releases: apply up to the expand file with `--through=0004_demo_store_expand.sql` before merging, let Production deploy, then apply the rest (0005 drops the personal-detail columns). From the expand step on, roll forward rather than back: pre-demo code cannot read orders the new code created.
 
 Run it from a checkout without `.env.local`: `vercel env run` lets that file override the chosen environment, so a Production run would otherwise reach the Development database. Preview and Development share one Neon project; Production has its own.
 

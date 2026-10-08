@@ -39,7 +39,6 @@ type OrderRow = {
   status: OrderStatus;
   payment_method: PaymentMethod;
   pickup_city: PickupCity | "";
-  email: string;
   subtotal_cents: number;
   shipping_cents: number;
   tax_cents: number;
@@ -50,10 +49,13 @@ type OrderRow = {
 
 type ItemRow = { order_id: string; product_id: string; name: string; quantity: number; unit_price_cents: number };
 
-/** An order plus the private fields the server checks but never returns. */
-export type StoredOrder = OrderSummary & { email: string; customerId: string | null; totalCents: number };
+/**
+ * An order plus the fields the server checks but never returns. This is a
+ * demo store: no name, email, phone or address is ever stored here.
+ */
+export type StoredOrder = OrderSummary & { customerId: string | null; totalCents: number };
 
-const orderColumns = `"id", "request_key", "customer_id", "status", "payment_method", "pickup_city", "email",
+const orderColumns = `"id", "request_key", "customer_id", "status", "payment_method", "pickup_city",
   "subtotal_cents", "shipping_cents", "tax_cents", "total_cents", "created_at", "settled_at"`;
 
 function toStored(row: OrderRow, items: ItemRow[]): StoredOrder {
@@ -75,13 +77,12 @@ function toStored(row: OrderRow, items: ItemRow[]): StoredOrder {
     vat: row.tax_cents / 100,
     grandTotal: row.total_cents / 100,
     savedToAccount: row.customer_id !== null,
-    email: row.email,
     customerId: row.customer_id,
     totalCents: row.total_cents,
   };
 }
 
-/** The public view: no email, address or customer ID. */
+/** The public view: no customer ID. */
 export function toSummary(order: StoredOrder): OrderSummary {
   return {
     id: order.id,
@@ -145,8 +146,7 @@ export type CreateOrderResult =
 function sameSubmission(existing: StoredOrder, input: NewOrder, customerId: string | null) {
   const requested = [...input.items].sort((a, b) => a.productId.localeCompare(b.productId));
   const stored = [...existing.lines].sort((a, b) => a.productId.localeCompare(b.productId));
-  return existing.email.toLowerCase() === input.customer.email.toLowerCase() &&
-    existing.payment === input.payment &&
+  return existing.payment === input.payment &&
     existing.customerId === customerId &&
     requested.length === stored.length &&
     requested.every((item, index) => item.productId === stored[index].productId && item.quantity === stored[index].quantity);
@@ -155,6 +155,8 @@ function sameSubmission(existing: StoredOrder, input: NewOrder, customerId: stri
 /**
  * Creates the order from server-calculated totals before any payment starts.
  * Retrying the same submission (same request key) returns the same order.
+ * The request carries no personal details at all: name, email, phone and
+ * address stay in the shopper's browser (demo store).
  */
 export async function createOrder(pool: pg.Pool, input: NewOrder, customerId: string | null): Promise<CreateOrderResult> {
   const priced = priceCart(input.items);
@@ -164,15 +166,12 @@ export async function createOrder(pool: pg.Pool, input: NewOrder, customerId: st
   return inTransaction(pool, async (tx) => {
     const inserted = await tx.query<OrderRow>(
       `insert into "audiophile_orders" ("id", "request_key", "customer_id", "status", "payment_method", "pickup_city",
-          "customer_name", "email", "phone", "address", "zip", "city", "country",
           "subtotal_cents", "shipping_cents", "tax_cents", "total_cents")
-        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         on conflict ("request_key") do nothing
         returning ${orderColumns}`,
       [
         newOrderId(), input.requestKey, customerId, initialStatus(input.payment), input.payment, input.pickupCity,
-        input.customer.name, input.customer.email, input.customer.phone, input.customer.address,
-        input.customer.zip, input.customer.city, input.customer.country,
         cents(priced.totals.subtotal), cents(priced.totals.shipping), cents(priced.totals.tax), priced.amountCents,
       ],
     );
@@ -265,7 +264,10 @@ export async function settleStripePayment(tx: Transaction, payment: StripePaymen
   const { rows } = await tx.query<{ status: OrderStatus; total_cents: number }>(
     `select "status", "total_cents" from "audiophile_orders" where "id" = $1 for update`, [payment.orderId]);
   const order = rows[0];
-  if (!order) return "unknown_order";
+  if (!order) {
+    console.error(JSON.stringify({ event: "payment_for_unknown_order", paymentIntentId: payment.paymentIntentId, status: payment.status }));
+    return "unknown_order";
+  }
   if (payment.currency !== "usd") return "amount_mismatch";
 
   const recorded = await tx.query(
@@ -300,4 +302,55 @@ export async function claimStripeEvent(tx: Transaction, eventId: string, type: s
     [eventId, type, orderId],
   );
   return rowCount === 1;
+}
+
+/**
+ * Unpaid orders older than seven days with their open card attempts. The
+ * purge cancels those attempts at Stripe first, so none can succeed later.
+ */
+export async function abandonedOrderAttempts(db: Transaction) {
+  const { rows } = await db.query<{ payment_intent_id: string }>(
+    `select p."payment_intent_id" from "audiophile_orders" o
+       join "audiophile_payments" p on p."order_id" = o."id"
+      where o."status" in ('pending_hosted', 'pending_transfer', 'pending_in_person', 'cancelled')
+        and o."created_at" < now() - interval '7 days'
+        and p."status" in ('requires_payment_method', 'requires_confirmation', 'requires_action')`,
+  );
+  return rows.map((row) => row.payment_intent_id);
+}
+
+/** Recent hosted Checkout pages of unpaid orders older than seven days. */
+export async function abandonedOrderSessions(db: Transaction) {
+  const { rows } = await db.query<{ session_id: string }>(
+    `select s."session_id" from "audiophile_orders" o
+       join "audiophile_checkout_sessions" s on s."order_id" = o."id"
+      where o."status" in ('pending_hosted', 'pending_transfer', 'pending_in_person', 'cancelled')
+        and o."created_at" < now() - interval '7 days'
+        and s."created_at" > now() - interval '25 hours'`,
+  );
+  return rows.map((row) => row.session_id);
+}
+
+/**
+ * Removes orders never paid within seven days, with their items, attempts,
+ * hosted pages and webhook receipts, plus rate-limit windows older than a
+ * day. An order is kept while any of its payments could hold money (anything
+ * but canceled or failed), so a charge that needs a refund is never lost.
+ */
+export async function purgeAbandonedOrders(pool: pg.Pool) {
+  return inTransaction(pool, async (tx) => {
+    const { rows } = await tx.query<{ id: string }>(
+      `delete from "audiophile_orders" o
+        where o."status" in ('pending_hosted', 'pending_transfer', 'pending_in_person', 'cancelled')
+          and o."created_at" < now() - interval '7 days'
+          and not exists (
+            select 1 from "audiophile_payments" p
+             where p."order_id" = o."id" and p."status" not in ('canceled', 'checkout_failed'))
+        returning o."id"`,
+    );
+    const ids = rows.map((row) => row.id);
+    await tx.query(`delete from "audiophile_stripe_events" where "order_id" = any($1::text[])`, [ids]);
+    const limits = await tx.query(`delete from "audiophile_rate_limits" where "window_start" < now() - interval '1 day'`);
+    return { purgedOrders: ids.length, purgedRateLimitWindows: limits.rowCount ?? 0 };
+  });
 }

@@ -1,4 +1,14 @@
 import type { BrowserContext } from "@playwright/test";
+import { appendFileSync, mkdirSync } from "node:fs";
+
+/**
+ * The store keeps no names or emails to find synthetic orders by, so each
+ * suite records the order IDs it creates; cleanup deletes exactly those.
+ */
+export function rememberOrder(orderId: string) {
+  mkdirSync("test-results-hosted", { recursive: true });
+  appendFileSync("test-results-hosted/created-orders.txt", orderId + "\n");
+}
 
 // Supplied by the runner's private environment. Values never reach test
 // output: they are attached only through per-origin request routing.
