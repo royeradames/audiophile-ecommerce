@@ -2,6 +2,7 @@ import type pg from "pg";
 import type { PaymentMethod } from "../payment-methods";
 import type { PaymentRequest } from "../payment-request";
 import {
+  cancelStripePaymentIntent,
   createStripeCheckoutSession,
   createStripePaymentIntent,
   expireStripeCheckoutSession,
@@ -10,11 +11,13 @@ import {
 } from "../stripe-api";
 import { intentStatus, paymentFromCheckoutSession, paymentFromIntent, type ReportedPayment } from "../stripe-webhook";
 import {
+  abandonedOrderAttempts,
   checkoutSessionsFor,
   countAttempts,
   getOrder,
   inTransaction,
   openAttempts,
+  purgeAbandonedOrders,
   recordCheckoutSession,
   settleStripePayment,
   type SettleOutcome,
@@ -78,7 +81,7 @@ const reusableStatuses = new Set(["requires_payment_method", "requires_confirmat
  * second charge, one still processing blocks a new charge, and an unfinished
  * one is reused, so cancelling and retrying keeps one order and one charge.
  */
-export async function cardIntentFor(db: pg.Pool, order: StoredOrder, email?: string): Promise<{ ok: true; clientSecret: string } | Refusal> {
+export async function cardIntentFor(db: pg.Pool, order: StoredOrder): Promise<{ ok: true; clientSecret: string } | Refusal> {
   let reusable: string | null = null;
   for (const attempt of await openAttempts(db, order.id)) {
     const intent = await retrieveStripePaymentIntent(attempt.payment_intent_id);
@@ -100,7 +103,6 @@ export async function cardIntentFor(db: pg.Pool, order: StoredOrder, email?: str
   const intent = await createStripePaymentIntent({
     orderId: order.id,
     amountCents: order.totalCents,
-    email,
     idempotencyKey: `audiophile:${order.id}:intent:${attempt}`,
   });
   if (typeof intent.id !== "string" || typeof intent.client_secret !== "string" || intent.livemode === true) {
@@ -126,7 +128,7 @@ export async function cardIntentFor(db: pg.Pool, order: StoredOrder, email?: str
 export async function hostedCheckoutFor(
   db: pg.Pool,
   order: StoredOrder,
-  input: { origin: string; description: string; email?: string },
+  input: { origin: string; description: string },
 ): Promise<{ ok: true; url: string } | Refusal> {
   const earlier = await checkoutSessionsFor(db, order.id);
   for (const sessionId of earlier) {
@@ -142,7 +144,6 @@ export async function hostedCheckoutFor(
   const session = await createStripeCheckoutSession({
     orderId: order.id,
     amountCents: order.totalCents,
-    email: input.email,
     origin: input.origin,
     description: input.description,
     // Simultaneous requests (two tabs, a double click) get the same page.
@@ -153,4 +154,26 @@ export async function hostedCheckoutFor(
   }
   await recordCheckoutSession(db, order.id, session.id);
   return { ok: true, url: session.url };
+}
+
+/**
+ * The daily purge: cancel abandoned orders' open card attempts at Stripe
+ * (recording whatever Stripe reports, in case one was paid meanwhile), then
+ * delete the orders that hold no money.
+ */
+export async function purgeAbandoned(db: pg.Pool) {
+  let cancelledAttempts = 0;
+  for (const intentId of await abandonedOrderAttempts(db)) {
+    let intent: Record<string, unknown>;
+    try {
+      intent = await cancelStripePaymentIntent(intentId);
+      cancelledAttempts += 1;
+    } catch {
+      // Already paid, processing or gone: record what Stripe says instead.
+      intent = await retrieveStripePaymentIntent(intentId).catch(() => ({}));
+    }
+    const reported = paymentFromIntent(intent);
+    if (reported) await recordPayment(db, reported);
+  }
+  return { cancelledAttempts, ...await purgeAbandonedOrders(db) };
 }

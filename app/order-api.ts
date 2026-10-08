@@ -42,15 +42,8 @@ export const newOrderSchema = z.strictObject({
   requestKey: z.uuid(),
   payment: z.enum(paymentMethods),
   pickupCity: pickupCitySchema,
-  customer: z.strictObject({
-    name: z.string().trim().min(1).max(200),
-    email: z.email().max(254),
-    phone: z.string().trim().min(1).max(60),
-    address: z.string().trim().min(1).max(300),
-    zip: z.string().trim().min(1).max(30),
-    city: z.string().trim().min(1).max(120),
-    country: z.string().trim().min(1).max(120),
-  }),
+  // No customer details: this demo store never receives them. Checkout still
+  // validates them in the browser so the form stays testable.
   items: z.array(z.strictObject({
     productId: z.string().min(1).max(100),
     quantity: z.number().int().min(1).max(99),

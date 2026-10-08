@@ -31,7 +31,7 @@ async function stripeRequest(path: string, init: RequestInit) {
 export async function createStripeCheckoutSession(input: {
   orderId: string;
   amountCents: number;
-  /** Prefills Stripe's page; never stored by the store. */
+  /** Prefills Stripe's page; only the guest-only fallback still sends it. */
   email?: string;
   origin: string;
   description: string;
@@ -78,7 +78,6 @@ export async function retrieveStripePaymentIntent(intentId: string) {
 export async function createStripePaymentIntent(input: {
   orderId: string;
   amountCents: number;
-  email?: string;
   /** Stripe returns the same intent for a repeated key instead of creating another. */
   idempotencyKey?: string;
 }) {
@@ -102,4 +101,9 @@ export async function createStripePaymentIntent(input: {
 /** Closes an open hosted Checkout page so it can no longer take payment. */
 export async function expireStripeCheckoutSession(sessionId: string) {
   return stripeRequest(`checkout/sessions/${encodeURIComponent(sessionId)}/expire`, { method: "POST" });
+}
+
+/** Cancels an unfinished test PaymentIntent so it can never be paid. */
+export async function cancelStripePaymentIntent(intentId: string) {
+  return stripeRequest(`payment_intents/${encodeURIComponent(intentId)}/cancel`, { method: "POST" });
 }

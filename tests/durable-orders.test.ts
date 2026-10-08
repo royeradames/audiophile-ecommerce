@@ -47,7 +47,7 @@ function json(url: string, body: unknown) {
 
 async function placeOrder(overrides: Record<string, unknown> = {}) {
   const response = await ordersRoute.POST(json("http://localhost/api/orders", {
-    requestKey: crypto.randomUUID(), payment: "element", pickupCity: "", customer, items: cart, ...overrides,
+    requestKey: crypto.randomUUID(), payment: "element", pickupCity: "", items: cart, ...overrides,
   }));
   return { status: response.status, body: await response.json() };
 }
@@ -321,7 +321,7 @@ test("a customer's history holds only their own orders", async (t) => {
     ('user-a', 'A', 'a@example.test', true), ('user-b', 'B', 'b@example.test', true)`);
   const pool = (await import("../app/server/database.ts")).getDatabase();
   assert.ok(pool);
-  const input = { requestKey: crypto.randomUUID(), payment: "transfer" as const, pickupCity: "" as const, customer, items: cart };
+  const input = { requestKey: crypto.randomUUID(), payment: "transfer" as const, pickupCity: "" as const, items: cart };
   const mine = await store.createOrder(pool, input, "user-a");
   await store.createOrder(pool, { ...input, requestKey: crypto.randomUUID() }, "user-b");
   await store.createOrder(pool, { ...input, requestKey: crypto.randomUUID() }, null);

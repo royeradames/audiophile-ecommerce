@@ -90,7 +90,7 @@ export async function POST(request: Request) {
     try {
       const payable = await payableOrder(runtime.db, payment, "element");
       if (!payable.ok) return Response.json({ error: payable.error }, { status: payable.status });
-      const intent = await cardIntentFor(runtime.db, payable.order, payment.email);
+      const intent = await cardIntentFor(runtime.db, payable.order);
       if (!intent.ok) return Response.json({ error: intent.error }, { status: intent.status });
       return Response.json({ clientSecret: intent.clientSecret, amount: payable.order.grandTotal });
     } catch {
@@ -102,7 +102,6 @@ export async function POST(request: Request) {
     const intent = await createStripePaymentIntent({
       orderId: payment.orderId,
       amountCents: payment.amountCents,
-      email: payment.email,
     });
     const clientSecret = typeof intent.client_secret === "string" ? intent.client_secret : null;
     if (!clientSecret) {

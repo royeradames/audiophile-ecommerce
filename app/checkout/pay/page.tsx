@@ -88,7 +88,7 @@ function CheckoutPayClient() {
     return (
       <PayBody
         message={server.state === "missing"
-          ? "No order has that ID. Check the link from your confirmation, or place the order again from checkout."
+          ? "No order has that ID. Orders never paid are deleted after 7 days; otherwise check the link from your confirmation, or place the order again from checkout."
           : "That order is not in this browser. Place it again from checkout, or open pending orders on the same device."}
       />
     );

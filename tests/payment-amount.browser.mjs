@@ -102,9 +102,9 @@ try {
   assert.deepEqual(saved, [forgedCard]);
   results.push('Own-card retry uses server amount despite a forged saved total; it does not claim payment or change the saved order.');
   for (const { body } of requests) {
-    assert.deepEqual(Object.keys(body).sort(), ['email', 'items', 'orderId']);
+    // Demo store: the email prefills Stripe in the browser but never reaches the store.
+    assert.deepEqual(Object.keys(body).sort(), ['items', 'orderId']);
     assert.deepEqual(body.items, productItems);
-    assert.equal(body.email, 'synthetic@example.invalid');
   }
   for (const width of [400, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 });

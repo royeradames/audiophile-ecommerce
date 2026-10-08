@@ -724,7 +724,7 @@ h3 {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 116px 20px 40px;
+  padding: 116px max(20px, env(safe-area-inset-right)) max(40px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
   background: rgb(0 0 0 / 0.55);
 }
 
@@ -1497,9 +1497,17 @@ legend {
   display: none;
 }
 
+/* Centred when it fits; scrolls from the top when it is taller than the
+   screen (the card form and its notes), so every button stays reachable. */
 .confirmation-layer {
-  align-items: center;
+  align-items: flex-start;
   padding-top: 40px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.confirmation-layer .confirmation-panel {
+  margin-block: auto;
 }
 
 .confirmation-panel {
@@ -1905,7 +1913,7 @@ legend {
   }
 
   .dialog-layer {
-    padding: 94px 12px 20px;
+    padding: 94px max(12px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   }
 
   .cart-panel {
@@ -1994,7 +2002,6 @@ legend {
   font-weight: 700;
 }
 
-
 .pay-actions {
   margin-top: 28px;
   max-width: 560px;
@@ -2025,12 +2032,10 @@ legend {
   margin-bottom: 24px;
 }
 
-
 /* Demo store notices */
 .demo-banner {
   margin: 0;
   padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
-  padding-top: max(10px, env(safe-area-inset-top));
   background: var(--accent-dark);
   color: #fff;
   font-size: 1rem;
@@ -2067,12 +2072,6 @@ legend {
 
 .card-payment .stack-hint {
   margin: 12px 0;
-}
-
-.dialog-layer {
-  padding-bottom: max(40px, env(safe-area-inset-bottom));
-  padding-left: max(20px, env(safe-area-inset-left));
-  padding-right: max(20px, env(safe-area-inset-right));
 }
 
 .checkout-intro .stack-hint {

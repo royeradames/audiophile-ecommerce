@@ -312,7 +312,6 @@ export default function CheckoutPage() {
           requestKey: submission.current.key,
           payment: value.payment,
           pickupCity,
-          customer,
           items: cart,
         });
         setSaving(false);
@@ -441,8 +440,14 @@ export default function CheckoutPage() {
                   flow with fictional details and Stripe&apos;s test card.
                 </p>
                 <p>
-                  The store keeps your order, its total and your country for the tax label.
-                  Your name, email, phone and address stay in this browser.
+                  The store saves the order and its total only. Your name, email, phone and
+                  address stay in this browser; the store doesn&apos;t save them. Stripe&apos;s test
+                  page may ask for an email and a name: use fictional ones.
+                </p>
+                <p>
+                  To stop abuse, the store sets an anonymous session cookie and keeps a keyed
+                  fingerprint of your connection for up to two days. Orders never paid are
+                  deleted after 7 days.
                 </p>
                 <button
                   className="button button-outline"

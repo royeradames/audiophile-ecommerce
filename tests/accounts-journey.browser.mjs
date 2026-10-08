@@ -202,7 +202,9 @@ try {
   const bob = await open(browsers.second, "third context");
   await signIn(bob, people.bob);
   await bob.page.getByRole("heading", { name: "No orders yet" }).waitFor();
+  // Regression (Preview, October 8): a signed-in account with no orders got a 503.
   const bobHistory = await bob.page.request.get(`${SHOP}/api/account/orders`);
+  assert.equal(bobHistory.status(), 200);
   assert.deepEqual((await bobHistory.json()).orders, []);
   log("Bob's history is empty; Alice's order stays hers.");
 

@@ -155,8 +155,8 @@ function sameSubmission(existing: StoredOrder, input: NewOrder, customerId: stri
 /**
  * Creates the order from server-calculated totals before any payment starts.
  * Retrying the same submission (same request key) returns the same order.
- * Only the country is kept from the shopper's details, for the tax label;
- * name, email, phone and address stay in the browser (demo store).
+ * The request carries no personal details at all: name, email, phone and
+ * address stay in the shopper's browser (demo store).
  */
 export async function createOrder(pool: pg.Pool, input: NewOrder, customerId: string | null): Promise<CreateOrderResult> {
   const priced = priceCart(input.items);
@@ -166,13 +166,12 @@ export async function createOrder(pool: pg.Pool, input: NewOrder, customerId: st
   return inTransaction(pool, async (tx) => {
     const inserted = await tx.query<OrderRow>(
       `insert into "audiophile_orders" ("id", "request_key", "customer_id", "status", "payment_method", "pickup_city",
-          "country", "subtotal_cents", "shipping_cents", "tax_cents", "total_cents")
-        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          "subtotal_cents", "shipping_cents", "tax_cents", "total_cents")
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         on conflict ("request_key") do nothing
         returning ${orderColumns}`,
       [
         newOrderId(), input.requestKey, customerId, initialStatus(input.payment), input.payment, input.pickupCity,
-        input.customer.country,
         cents(priced.totals.subtotal), cents(priced.totals.shipping), cents(priced.totals.tax), priced.amountCents,
       ],
     );
@@ -265,7 +264,10 @@ export async function settleStripePayment(tx: Transaction, payment: StripePaymen
   const { rows } = await tx.query<{ status: OrderStatus; total_cents: number }>(
     `select "status", "total_cents" from "audiophile_orders" where "id" = $1 for update`, [payment.orderId]);
   const order = rows[0];
-  if (!order) return "unknown_order";
+  if (!order) {
+    console.error(JSON.stringify({ event: "payment_for_unknown_order", paymentIntentId: payment.paymentIntentId, status: payment.status }));
+    return "unknown_order";
+  }
   if (payment.currency !== "usd") return "amount_mismatch";
 
   const recorded = await tx.query(
@@ -302,20 +304,37 @@ export async function claimStripeEvent(tx: Transaction, eventId: string, type: s
   return rowCount === 1;
 }
 
-const unpaidStatuses = ["pending_hosted", "pending_transfer", "pending_in_person", "cancelled"];
+/**
+ * Unpaid orders older than seven days with their open card attempts. The
+ * purge cancels those attempts at Stripe first, so none can succeed later.
+ */
+export async function abandonedOrderAttempts(db: Transaction) {
+  const { rows } = await db.query<{ payment_intent_id: string }>(
+    `select p."payment_intent_id" from "audiophile_orders" o
+       join "audiophile_payments" p on p."order_id" = o."id"
+      where o."status" in ('pending_hosted', 'pending_transfer', 'pending_in_person', 'cancelled')
+        and o."created_at" < now() - interval '7 days'
+        and p."status" in ('requires_payment_method', 'requires_confirmation', 'requires_action')`,
+  );
+  return rows.map((row) => row.payment_intent_id);
+}
 
 /**
- * Removes orders that were never paid within seven days, with their items,
- * payment attempts and webhook receipts, plus rate-limit windows older than a
- * day. Paid orders stay. Run daily by Vercel Cron.
+ * Removes orders never paid within seven days, with their items, attempts,
+ * hosted pages and webhook receipts, plus rate-limit windows older than a
+ * day. An order is kept while any of its payments could hold money (anything
+ * but canceled or failed), so a charge that needs a refund is never lost.
  */
 export async function purgeAbandonedOrders(pool: pg.Pool) {
   return inTransaction(pool, async (tx) => {
     const { rows } = await tx.query<{ id: string }>(
-      `delete from "audiophile_orders"
-        where "status" = any($1::text[]) and "created_at" < now() - interval '7 days'
-        returning "id"`,
-      [unpaidStatuses],
+      `delete from "audiophile_orders" o
+        where o."status" in ('pending_hosted', 'pending_transfer', 'pending_in_person', 'cancelled')
+          and o."created_at" < now() - interval '7 days'
+          and not exists (
+            select 1 from "audiophile_payments" p
+             where p."order_id" = o."id" and p."status" not in ('canceled', 'checkout_failed'))
+        returning o."id"`,
     );
     const ids = rows.map((row) => row.id);
     await tx.query(`delete from "audiophile_stripe_events" where "order_id" = any($1::text[])`, [ids]);

@@ -43,7 +43,6 @@ export async function POST(request: Request) {
       const hosted = await hostedCheckoutFor(runtime.db, payable.order, {
         origin: requestOrigin(request),
         description: payment.description,
-        email: payment.email,
       });
       if (!hosted.ok) return Response.json({ error: hosted.error }, { status: hosted.status });
       return Response.json({ url: hosted.url });

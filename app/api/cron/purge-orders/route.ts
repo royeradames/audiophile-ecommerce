@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { purgeAbandonedOrders } from "../../../server/order-store";
+import { purgeAbandoned } from "../../../server/payments";
 import { serverRuntime } from "../../../server/runtime";
 
 export const dynamic = "force-dynamic";
@@ -13,8 +13,9 @@ function authorized(request: Request) {
 }
 
 /**
- * Daily Vercel Cron (vercel.json). Deletes orders never paid within seven
- * days, and rate-limit windows older than a day. Vercel sends CRON_SECRET as
+ * Daily Vercel Cron (vercel.json). Cancels the open card attempts of orders
+ * never paid within seven days, deletes those orders, and deletes rate-limit
+ * windows older than a day. Vercel sends CRON_SECRET as
  * a bearer token; without it, nothing runs.
  */
 export async function GET(request: Request) {
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
   const runtime = serverRuntime();
   if (!runtime) return Response.json({ purgedOrders: 0, purgedRateLimitWindows: 0 }, { headers: noStore });
   try {
-    const result = await purgeAbandonedOrders(runtime.db);
+    const result = await purgeAbandoned(runtime.db);
     console.log(JSON.stringify({ event: "abandoned_orders_purged", ...result }));
     return Response.json(result, { headers: noStore });
   } catch {

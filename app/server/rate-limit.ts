@@ -1,10 +1,15 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
+import { isIPv6 } from "node:net";
 import type pg from "pg";
 
 /**
  * Fixed ten-minute windows in the database, so every serverless instance
- * shares the count. Addresses and session IDs are stored only as SHA-256
- * buckets, and windows older than a day are deleted by the daily purge.
+ * shares the count. Addresses and session IDs are stored only as HMAC-SHA-256
+ * buckets keyed by RATE_LIMIT_SECRET, so a copy of the table does not reveal
+ * them, and windows older than a day are deleted by the daily purge.
+ *
+ * The address limit is the real one. The session limit only slows honest
+ * browsers: a script can drop the cookie and get a new session each time.
  */
 const WINDOW_SECONDS = 600;
 export const limits = {
@@ -15,9 +20,28 @@ export const limits = {
 
 export const SESSION_COOKIE = "audiophile_session";
 
+/**
+ * The client address Vercel's edge reports. IPv6 clients usually control a
+ * whole /64, so they are counted per /64 rather than per address.
+ */
 export function clientAddress(request: Request) {
   const forwarded = request.headers.get("x-vercel-forwarded-for") ?? request.headers.get("x-forwarded-for") ?? "";
-  return forwarded.split(",")[0].trim() || "unknown";
+  const address = forwarded.split(",")[0].trim();
+  if (!address) return "unknown";
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address);
+  if (mapped) return mapped[1];
+  if (!isIPv6(address)) return address;
+  return ipv6Prefix64(address);
+}
+
+function ipv6Prefix64(address: string) {
+  const [head, tail = ""] = address.toLowerCase().split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail ? tail.split(":") : [];
+  const groups = address.includes("::")
+    ? [...left, ...Array(8 - left.length - right.length).fill("0"), ...right]
+    : left;
+  return groups.slice(0, 4).map((group) => group.replace(/^0+(?=.)/, "")).join(":") + "::/64";
 }
 
 export function browserSession(request: Request) {
@@ -35,8 +59,13 @@ export function newSessionCookie(request: Request) {
   return `${SESSION_COOKIE}=${randomBytes(18).toString("base64url")}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400${secure ? "; Secure" : ""}`;
 }
 
+// Without a configured secret (local runs), each process keys its own HMAC,
+// which still never stores a reversible address.
+const fallbackSecret = randomBytes(32).toString("hex");
+
 function bucket(scope: string, id: string) {
-  return createHash("sha256").update(`audiophile-rate-limit:${scope}:${id}`).digest("hex");
+  const secret = process.env.RATE_LIMIT_SECRET?.trim() || fallbackSecret;
+  return createHmac("sha256", secret).update(`${scope}:${id}`).digest("hex");
 }
 
 /**
