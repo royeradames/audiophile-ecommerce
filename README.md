@@ -52,7 +52,7 @@ npm run db:plan
 vercel env run -e preview -- node scripts/migrate.mjs --neon-project=<NEON_PROJECT_ID> --reviewed-sha256=<combined hash>
 ```
 
-Expand/contract releases: apply up to the expand file with `--through=0004_demo_store_expand.sql` before merging, let Production deploy, then apply the rest (0005 drops the personal-detail columns; after it, roll forward rather than back to pre-demo code).
+Expand/contract releases: apply up to the expand file with `--through=0004_demo_store_expand.sql` before merging, let Production deploy, then apply the rest (0005 drops the personal-detail columns). From the expand step on, roll forward rather than back: pre-demo code cannot read orders the new code created.
 
 Run it from a checkout without `.env.local`: `vercel env run` lets that file override the chosen environment, so a Production run would otherwise reach the Development database. Preview and Development share one Neon project; Production has its own.
 

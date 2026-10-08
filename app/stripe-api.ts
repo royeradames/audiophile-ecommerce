@@ -31,7 +31,7 @@ async function stripeRequest(path: string, init: RequestInit) {
 export async function createStripeCheckoutSession(input: {
   orderId: string;
   amountCents: number;
-  /** Prefills Stripe's page; only the guest-only fallback still sends it. */
+  /** Optional prefill for Stripe's page. The browser no longer sends it, so it is unset. */
   email?: string;
   origin: string;
   description: string;

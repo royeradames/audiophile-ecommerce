@@ -12,6 +12,7 @@ import {
 import { intentStatus, paymentFromCheckoutSession, paymentFromIntent, type ReportedPayment } from "../stripe-webhook";
 import {
   abandonedOrderAttempts,
+  abandonedOrderSessions,
   checkoutSessionsFor,
   countAttempts,
   getOrder,
@@ -175,5 +176,19 @@ export async function purgeAbandoned(db: pg.Pool) {
     const reported = paymentFromIntent(intent);
     if (reported) await recordPayment(db, reported);
   }
-  return { cancelledAttempts, ...await purgeAbandonedOrders(db) };
+  // Hosted pages stay payable for 24 hours: close recent ones, and record a
+  // page that was paid meanwhile so its order is kept.
+  let expiredPages = 0;
+  for (const sessionId of await abandonedOrderSessions(db)) {
+    const session: Record<string, unknown> = await expireStripeCheckoutSession(sessionId)
+      .then((expired) => { expiredPages += 1; return expired; })
+      .catch(() => retrieveStripeCheckoutSession(sessionId).catch(() => ({})));
+    const reported = paymentFromCheckoutSession(session);
+    if (reported) await recordPayment(db, reported);
+    else if (session.status !== "expired") {
+      // Stripe could not confirm the page is closed: keep everything for tomorrow.
+      return { cancelledAttempts, expiredPages, purgedOrders: 0, purgedRateLimitWindows: 0, deferred: true };
+    }
+  }
+  return { cancelledAttempts, expiredPages, ...await purgeAbandonedOrders(db) };
 }

@@ -319,6 +319,18 @@ export async function abandonedOrderAttempts(db: Transaction) {
   return rows.map((row) => row.payment_intent_id);
 }
 
+/** Recent hosted Checkout pages of unpaid orders older than seven days. */
+export async function abandonedOrderSessions(db: Transaction) {
+  const { rows } = await db.query<{ session_id: string }>(
+    `select s."session_id" from "audiophile_orders" o
+       join "audiophile_checkout_sessions" s on s."order_id" = o."id"
+      where o."status" in ('pending_hosted', 'pending_transfer', 'pending_in_person', 'cancelled')
+        and o."created_at" < now() - interval '7 days'
+        and s."created_at" > now() - interval '25 hours'`,
+  );
+  return rows.map((row) => row.session_id);
+}
+
 /**
  * Removes orders never paid within seven days, with their items, attempts,
  * hosted pages and webhook receipts, plus rate-limit windows older than a

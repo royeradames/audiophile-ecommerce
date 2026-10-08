@@ -98,7 +98,7 @@ export async function readPaymentRequest(request: Request) {
 
   const parsed = paymentRequestSchema.safeParse(body.payload);
   if (!parsed.success) {
-    return invalidRequest("Send an order ID, email, and product quantities from 1 to 99. Prices and totals are calculated by the store.");
+    return invalidRequest("Send an order ID and product quantities from 1 to 99. Prices and totals are calculated by the store.");
   }
   const { orderId, email, items } = parsed.data;
   const priced = priceCart(items);

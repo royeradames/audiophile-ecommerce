@@ -63,8 +63,15 @@ export function newSessionCookie(request: Request) {
 // which still never stores a reversible address.
 const fallbackSecret = randomBytes(32).toString("hex");
 
+let warned = false;
+
 function bucket(scope: string, id: string) {
-  const secret = process.env.RATE_LIMIT_SECRET?.trim() || fallbackSecret;
+  const configured = process.env.RATE_LIMIT_SECRET?.trim();
+  if (!configured && process.env.VERCEL_ENV && !warned) {
+    warned = true;
+    console.error(JSON.stringify({ event: "rate_limit_secret_missing", note: "limits are counted per instance" }));
+  }
+  const secret = configured || fallbackSecret;
   return createHmac("sha256", secret).update(`${scope}:${id}`).digest("hex");
 }
 

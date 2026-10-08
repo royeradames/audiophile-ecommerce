@@ -44,6 +44,10 @@ export async function POST(request: Request) {
   const body = await readJsonBody(request, "order details");
   if (!body.ok) return respond({ error: body.error }, body.status);
   const parsed = newOrderSchema.safeParse(body.payload);
+  if (!parsed.success && body.payload && typeof body.payload === "object" && "customer" in body.payload) {
+    // A tab opened before the demo-store release still sends checkout details.
+    return respond({ error: "This checkout page is out of date. Reload it and place the order again; nothing was charged." }, 400);
+  }
   if (!parsed.success) {
     return respond({ error: "Check the billing, shipping and payment details. Prices and totals are calculated by the store." }, 400);
   }

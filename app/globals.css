@@ -898,6 +898,8 @@ h3 {
 }
 
 fieldset {
+  /* Fieldsets default to min-width: min-content and can overflow a narrow form. */
+  min-width: 0;
   padding: 0;
   border: 0;
   margin: 0 0 48px;

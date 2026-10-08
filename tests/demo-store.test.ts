@@ -107,10 +107,21 @@ test("unpaid orders are purged after seven days; paid ones, and ones holding mon
   const staleOpenCard = await place();
   const staleProcessing = await place();
   const staleOvercharged = await place();
+  const staleHostedOpen = await place("hosted");
+  const staleHostedPaid = await place("hosted");
   const freshPending = await place();
   const cancelled: string[] = [];
+  const hosted = (id: string, orderId: string, status: string, paymentStatus: string) => Response.json({
+    id, object: "checkout.session", livemode: false, client_reference_id: orderId, currency: "usd",
+    amount_total: TOTAL_CENTS, status, payment_status: paymentStatus,
+    payment_intent: paymentStatus === "paid" ? "pi_hosted_paid" : null,
+  });
   t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
     const path = new URL(url).pathname;
+    // A recent hosted page: the open one is closed; the other was paid meanwhile.
+    if (path === "/v1/checkout/sessions/cs_test_open/expire") return hosted("cs_test_open", staleHostedOpen, "expired", "unpaid");
+    if (path === "/v1/checkout/sessions/cs_test_paid/expire") return Response.json({ error: { message: "complete" } }, { status: 400 });
+    if (path === "/v1/checkout/sessions/cs_test_paid") return hosted("cs_test_paid", staleHostedPaid, "complete", "paid");
     if (path.endsWith("/cancel")) {
       const id = path.split("/")[3];
       if (id === "pi_processing") return Response.json({ error: { message: "processing" } }, { status: 400 });
@@ -136,6 +147,8 @@ test("unpaid orders are purged after seven days; paid ones, and ones holding mon
     id: "evt_demo_short", type: "payment_intent.succeeded", livemode: false,
     data: { object: { ...intent(staleOvercharged, "pi_demo_short", "succeeded"), amount: 100, amount_received: 100 } },
   }));
+  await database.query(`insert into "audiophile_checkout_sessions" ("session_id", "order_id") values ('cs_test_open', $1), ('cs_test_paid', $2)`,
+    [staleHostedOpen, staleHostedPaid]);
   await database.query(`update "audiophile_orders" set "created_at" = now() - interval '8 days' where "id" <> $1`, [freshPending]);
   await database.query(`insert into "audiophile_rate_limits" ("bucket", "window_start", "hits") values ($1, now() - interval '2 days', 3)`, ["a".repeat(64)]);
 
@@ -146,11 +159,14 @@ test("unpaid orders are purged after seven days; paid ones, and ones holding mon
   }));
   assert.equal(purged.status, 200);
   const result = await purged.json();
-  assert.equal(result.purgedOrders, 3, "pending, transfer and the cancelled open card order");
+  assert.equal(result.purgedOrders, 4, "pending, transfer, the cancelled card order and the closed hosted page's order");
+  assert.equal(result.expiredPages, 1);
   assert.equal(result.purgedRateLimitWindows, 1);
   assert.deepEqual(cancelled, ["pi_open"], "The open card attempt was cancelled before its order was deleted");
   const { rows } = await database.query(`select "id" from "audiophile_orders"`);
-  assert.deepEqual(rows.map((row) => row.id).sort(), [stalePaid, staleProcessing, staleOvercharged, freshPending].sort());
+  assert.deepEqual(rows.map((row) => row.id).sort(), [stalePaid, staleProcessing, staleOvercharged, staleHostedPaid, freshPending].sort());
+  const paidMeanwhile = await database.query(`select "status" from "audiophile_orders" where "id" = $1`, [staleHostedPaid]);
+  assert.equal(paidMeanwhile.rows[0].status, "paid", "A hosted page paid before the purge settles its order");
   void stalePending; void staleTransfer;
 });
 
