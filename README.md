@@ -64,6 +64,6 @@ Sign-in happens on the Breakthrough accounts site; Audiophile keeps only its own
 
 ## Checks
 
-- `npm test`: unit and PostgreSQL (in-memory PGlite) regressions, the Sites build and its HTML contracts.
+- `npm test`: unit and PostgreSQL (in-memory PGlite) regressions, the Sites build and its HTML contracts, then the Vercel build and the layout and identity regression (`tests/layout-identity.browser.mjs`, about two minutes, needs Google Chrome): 15 routes at 22 widths, the phone menu, the cart dialog and each page's share card.
 - `npm run build:vercel`, then `npm run test:journey`: a real-browser journey on this machine. It runs the reviewed issuer and the built app over HTTPS on `*.localhost`, signs in two synthetic accounts, pays with Stripe's published test card (test keys from `.env.local`), and checks the order history across two browsers.
 - `npm run test:hosted`: the same order journey against the protected Preview (`AUDIOPHILE_PREVIEW_URL`, `AUDIOPHILE_PREVIEW_BYPASS`, `STRIPE_TEST_SECRET_KEY`); the account journey also needs the issuer's preview secrets. The **Hosted Audiophile journey** workflow runs it after each Preview deploy of the registered branch, then `scripts/cleanup-suite-data.mjs` removes the synthetic orders and local account records. Synthetic issuer accounts are the issuer's to remove.

@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "../../site-identity";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
+  path: "/checkout/stripe",
   title: "Stripe test return",
   description: "Stripe test Checkout return. Confirmation here is not a live merchant charge.",
-};
+});
 
 export default function StripeReturnLayout({
   children,

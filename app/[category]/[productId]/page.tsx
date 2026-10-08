@@ -5,6 +5,7 @@ import { AddToCart } from "../../add-to-cart";
 import { formatPrice, getProduct } from "../../catalog";
 import { ResponsiveImage } from "../../responsive-image";
 import { BestGear, CategoryLinks } from "../../shared-sections";
+import { pageMetadata } from "../../site-identity";
 
 type ProductPageProps = {
   params: Promise<{ category: string; productId: string }>;
@@ -13,7 +14,13 @@ type ProductPageProps = {
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
   const { productId } = await params;
   const product = getProduct(productId);
-  return product ? { title: product.name, description: product.description } : {};
+  if (!product) return {};
+  return pageMetadata({
+    path: `/${product.category}/${product.productId}`,
+    title: product.name,
+    description: product.description,
+    image: product.image.desktop,
+  });
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {

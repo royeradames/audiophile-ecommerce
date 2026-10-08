@@ -256,6 +256,11 @@ h3 {
   justify-content: center;
 }
 
+/* The phone menu only shows at 900 px and below, while open. */
+.menu-nav {
+  display: none;
+}
+
 .primary-nav a,
 .site-footer nav a {
   font-size: 1rem; /* 16 px floor */

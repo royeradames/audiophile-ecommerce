@@ -20,6 +20,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const {
     items,
     itemCount,
@@ -33,6 +34,29 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isCartOpen) closeButtonRef.current?.focus();
   }, [isCartOpen]);
+
+  // Escape closes the phone menu and puts focus back on its button.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setMenuOpen(false);
+      menuButtonRef.current?.focus();
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [menuOpen]);
+
+  const navigationLinks = navigation.map((item) => (
+    <Link
+      key={item.href}
+      href={item.href}
+      aria-current={pathname === item.href ? "page" : undefined}
+      onClick={() => setMenuOpen(false)}
+    >
+      {item.label}
+    </Link>
+  ));
 
   const detailedItems = items.flatMap((line) => {
     const product = getProduct(line.productId);
@@ -48,6 +72,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <header className="site-header">
         <div className="header-inner">
           <button
+            ref={menuButtonRef}
             className="menu-button"
             type="button"
             aria-expanded={menuOpen}
@@ -59,21 +84,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           <Link className="wordmark" href="/" aria-label="Audiophile home">
             audiophile
           </Link>
-          <nav
-            id="primary-navigation"
-            className={`primary-nav ${menuOpen ? "is-open" : ""}`}
-            aria-label="Primary navigation"
-          >
-            {navigation.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={pathname === item.href ? "page" : undefined}
-                onClick={() => setMenuOpen(false)}
-              >
-                {item.label}
-              </Link>
-            ))}
+          {/* Wide screens: the links sit between the wordmark and the cart. */}
+          <nav id="site-navigation" className="primary-nav desktop-nav" aria-label="Primary navigation">
+            {navigationLinks}
           </nav>
           <button
             className="cart-button"
@@ -84,6 +97,15 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           >
             Cart <span aria-hidden="true">{itemCount}</span>
           </button>
+          {/* Phones: the menu opens as a row under the bar, so it follows the cart
+              in the DOM and Tab meets Menu, wordmark, Cart, then the links. */}
+          <nav
+            id="primary-navigation"
+            className={`primary-nav menu-nav ${menuOpen ? "is-open" : ""}`}
+            aria-label="Primary navigation"
+          >
+            {navigationLinks}
+          </nav>
         </div>
       </header>
 
