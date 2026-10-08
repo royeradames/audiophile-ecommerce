@@ -232,6 +232,14 @@ try {
     if (!(await page.evaluate(() => document.activeElement?.classList.contains("menu-button")))) failures.push(`menu @${width}: Escape did not return focus to the menu button`);
     if (await page.locator("#primary-navigation").isVisible()) await page.locator(".menu-button").click();
     await menu.click();
+    // With the menu open, the cart dialog owns Escape: it closes, the menu stays.
+    await page.locator(".cart-button").click();
+    await page.keyboard.press("Escape");
+    if (await page.locator(".cart-panel").isVisible()) failures.push(`menu @${width}: Escape left the cart open`);
+    if (!(await page.locator("#primary-navigation").isVisible())) {
+      failures.push(`menu @${width}: Escape in the cart also closed the menu`);
+      await menu.click();
+    }
     await page.getByRole("button", { name: "Close" }).click();
     if (await page.locator("#primary-navigation").isVisible()) failures.push(`menu @${width}: Close left the menu open`);
     await menu.click();
@@ -257,6 +265,16 @@ try {
   });
   failures.push(...cart.map((problem) => `cart dialog @320: ${problem}`));
 
+  // The open menu closes when the window widens past 900 px, so it never reopens by itself.
+  await page.setViewportSize({ width: 768, height: 800 });
+  await page.goto(base + "/");
+  await page.getByRole("button", { name: "Menu" }).click();
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.waitForTimeout(150);
+  await page.setViewportSize({ width: 768, height: 800 });
+  await page.waitForTimeout(150);
+  if (await page.locator("#primary-navigation").isVisible()) failures.push("menu: reopened after the window widened past 900 px and narrowed again");
+
   // Desktop tab order: wordmark, the links left to right, then Cart.
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(base + "/");
@@ -264,6 +282,8 @@ try {
   for (const problem of await headerTabOrder(page)) failures.push(`desktop header @1280: ${problem}`);
 
   const homeCard = {};
+  // Transactional and owner pages stay out of search and have no card of their own.
+  const privateRoutes = new Set(["/payments", "/zelle", "/checkout", "/orders", "/account"]);
   // Site identity on every route.
   for (const route of routes) {
     await page.goto(base + route);
@@ -278,10 +298,19 @@ try {
       ogImage: document.querySelector('meta[property="og:image"]')?.getAttribute("content"),
       ogTitle: document.querySelector('meta[property="og:title"]')?.getAttribute("content"),
       ogDescription: document.querySelector('meta[property="og:description"]')?.getAttribute("content"),
+      robots: document.querySelector('meta[name="robots"]')?.getAttribute("content") ?? "",
+      canonical: document.querySelector('link[rel="canonical"]')?.getAttribute("href"),
     }));
     if (identity.siteName !== "Audiophile") failures.push(`${route}: og:site_name is ${identity.siteName}`);
     if (!identity.website) failures.push(`${route}: no WebSite JSON-LD with the canonical name and URL`);
-    // Every page shares its own card: its own og:url, title and description (LND1, S1).
+    if (privateRoutes.has(route)) {
+      if (!/noindex/.test(identity.robots)) failures.push(`${route}: private page is not noindex`);
+      if (identity.canonical || identity.ogUrl) failures.push(`${route}: private page declares a canonical or og:url`);
+      continue;
+    }
+    if (/noindex/.test(identity.robots)) failures.push(`${route}: public page is noindex`);
+    if (identity.canonical?.replace(/\/$/, "") !== ("https://audiophile.royeradames.com" + route).replace(/\/$/, "")) failures.push(`${route}: canonical is ${identity.canonical}`);
+    // Every public page shares its own card: its own og:url, title and description (LND1, S1).
     const expectedUrl = ("https://audiophile.royeradames.com" + route).replace(/\/$/, "");
     if ((identity.ogUrl || "").replace(/\/$/, "") !== expectedUrl) failures.push(`${route}: og:url is ${identity.ogUrl}, expected ${expectedUrl}`);
     if (!identity.ogImage?.startsWith("https://audiophile.royeradames.com/")) failures.push(`${route}: og:image is ${identity.ogImage}`);

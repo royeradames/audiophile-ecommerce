@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     path: `/${product.category}/${product.productId}`,
     title: product.name,
     description: product.description,
-    image: product.image.desktop,
+    image: { url: product.image.desktop, width: 1080, height: 1120 },
   });
 }
 

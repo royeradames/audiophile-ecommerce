@@ -35,17 +35,29 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     if (isCartOpen) closeButtonRef.current?.focus();
   }, [isCartOpen]);
 
-  // Escape closes the phone menu and puts focus back on its button.
+  // Escape closes the phone menu and puts focus back on its button. While the
+  // cart dialog is open, Escape belongs to the cart alone.
   useEffect(() => {
     if (!menuOpen) return;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || isCartOpen) return;
       setMenuOpen(false);
       menuButtonRef.current?.focus();
     };
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [menuOpen]);
+  }, [menuOpen, isCartOpen]);
+
+  // The phone menu hides above 900 px; close it then, so it does not reopen
+  // by itself when the window narrows again.
+  useEffect(() => {
+    const wide = window.matchMedia("(min-width: 901px)");
+    const closeWhenWide = () => {
+      if (wide.matches) setMenuOpen(false);
+    };
+    wide.addEventListener("change", closeWhenWide);
+    return () => wide.removeEventListener("change", closeWhenWide);
+  }, []);
 
   const navigationLinks = navigation.map((item) => (
     <Link

@@ -12,7 +12,7 @@ const port = await new Promise((resolve) => {
   });
 });
 const url = `http://127.0.0.1:${port}`;
-const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "-H", "127.0.0.1", "-p", String(port)], { stdio: "ignore" });
+const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "-H", "127.0.0.1", "-p", String(port)], { stdio: ["ignore", "ignore", "inherit"] });
 try {
   let ready = false;
   for (let attempt = 0; attempt < 60 && !ready; attempt += 1) {
