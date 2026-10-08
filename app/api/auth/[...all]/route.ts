@@ -1,3 +1,4 @@
+import { requestOrigin } from "../../../request-origin";
 import { serverRuntime } from "../../../server/runtime";
 
 export const dynamic = "force-dynamic";
@@ -16,11 +17,25 @@ function callbackFailure(response: Response | null, origin: string) {
   return new Response(null, { status: 303, headers });
 }
 
-async function handle(request: Request) {
+/**
+ * The account handler refuses any origin but this deployment's registered
+ * one. Behind a TLS-terminating proxy the server sees plain HTTP, so present
+ * the address the browser used: the forwarded host and protocol, the same
+ * origin the Stripe redirects use. Vercel's edge sets both headers.
+ */
+function asSeenByBrowser(request: Request) {
+  const seen = new URL(request.url);
+  const origin = requestOrigin(request);
+  if (seen.origin === origin) return request;
+  return new Request(new URL(seen.pathname + seen.search, origin), request);
+}
+
+async function handle(incoming: Request) {
   const accounts = serverRuntime()?.accounts;
   if (!accounts) {
     return Response.json({ error: "Customer accounts are coming soon." }, { status: 404, headers: noStore });
   }
+  const request = asSeenByBrowser(incoming);
   const url = new URL(request.url);
   const callback = request.method === "GET" && url.pathname === callbackPath;
   try {

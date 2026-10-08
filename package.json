@@ -12,7 +12,11 @@
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "test": "node --experimental-strip-types --test tests/*.test.ts && npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "db:plan": "node scripts/migrate.mjs --plan",
+    "db:migrate": "node scripts/migrate.mjs",
+    "test:journey": "node --experimental-strip-types tests/accounts-journey.browser.mjs",
+    "test:hosted": "playwright test -c playwright.hosted.config.ts"
   },
   "dependencies": {
     "@royer/auth": "file:vendor/royer-auth-0.1.0-rc.4.tgz",

@@ -2003,3 +2003,24 @@ legend {
   margin-top: 28px;
   max-width: 560px;
 }
+
+.order-list > li {
+  min-width: 0;
+}
+
+@media (max-width: 620px) {
+  .order-card-head-link {
+    flex-direction: column;
+  }
+
+  .order-card-head-link .button {
+    width: 100%;
+  }
+}
+
+.order-card h2 {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}

@@ -15,7 +15,7 @@ export function OrderSummaryCard({ order, headingLevel = 3, linkToOrder = false 
   const Heading = headingLevel === 2 ? "h2" : "h3";
   return (
     <article className="order-card" aria-labelledby={`${order.id}-title`}>
-      <header className="order-card-head">
+      <header className={`order-card-head${linkToOrder ? " order-card-head-link" : ""}`}>
         <div>
           <p className={`stack-status order-status is-${order.status}`}>{orderStatusLabels[order.status]}</p>
           <Heading id={`${order.id}-title`}>{order.id}</Heading>

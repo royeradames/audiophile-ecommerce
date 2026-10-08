@@ -4,12 +4,14 @@ import pg from "pg";
 
 /**
  * A disposable in-memory PostgreSQL reached through the real `pg` driver, so
- * route code runs exactly as it does against Neon. It serves one session at a
- * time; the app's pool is limited to match.
+ * route code runs exactly as it does against Neon. PGlite is a single
+ * session, so the app's pool is limited to one connection.
  */
 export async function startTestDatabase() {
   const database = await PGlite.create();
-  const server = new PGLiteSocketServer({ db: database, host: "127.0.0.1", port: 0 });
+  // Two sockets so a restarted pool can connect while the old socket is still
+  // closing. The app's pool uses one at a time, so queries never interleave.
+  const server = new PGLiteSocketServer({ db: database, host: "127.0.0.1", port: 0, maxConnections: 2 });
   await server.start();
   const url = `postgresql://postgres@${server.getServerConn()}/postgres?sslmode=disable`;
   const previous = { url: process.env.DATABASE_URL, max: process.env.DATABASE_POOL_MAX };
