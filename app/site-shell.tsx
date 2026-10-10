@@ -114,16 +114,18 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           <nav
             id="primary-navigation"
             className={`primary-nav menu-nav ${menuOpen ? "is-open" : ""}`}
-            aria-label="Primary navigation"
+            aria-label="Site menu"
           >
             {navigationLinks}
           </nav>
         </div>
       </header>
 
-      <p className="demo-banner">
-        <strong>Demo store:</strong> nothing is sold, charged or shipped. Card payments use Stripe test mode.
-      </p>
+      <aside aria-label="Demo store notice">
+        <p className="demo-banner">
+          <strong>Demo store:</strong> nothing is sold, charged or shipped. Card payments use Stripe test mode.
+        </p>
+      </aside>
       <main>{children}</main>
 
       <footer className="site-footer">
@@ -180,7 +182,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                         <strong>{product.shortName}</strong>
                         <span>{formatPrice(product.price)}</span>
                       </div>
-                      <div className="quantity-control" aria-label={`${product.name} quantity`}>
+                      <div className="quantity-control" role="group" aria-label={`${product.name} quantity`}>
                         <button
                           type="button"
                           onClick={() => setQuantity(product.productId, quantity - 1)}

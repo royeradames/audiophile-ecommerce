@@ -192,3 +192,26 @@ test("every page says this is a demo store, and checkout offers sample details",
   assert.match(checkout, /Fill sample details/);
   assert.match(checkout, /name, email, phone and address stay in this browser/i, "Checkout says what the server keeps");
 });
+
+// Frontend Mentor score, October 10: served HTML must validate (html-validate unique-landmark,
+// aria-label-misuse, no-redundant-for, valid-autocomplete) and every block sits in a landmark (axe region).
+test("landmarks have unique names and the demo notice sits in one", async () => {
+  const html = await (await render("/")).text();
+  const navLabels = [...html.matchAll(/<nav\b[^>]*aria-label="([^"]+)"/g)].map((match) => match[1]);
+  assert.ok(navLabels.length >= 2);
+  assert.equal(new Set(navLabels).size, navLabels.length, `navigation landmarks share a name: ${navLabels.join(", ")}`);
+  assert.match(html, /<aside[^>]*aria-label="Demo store notice"[^>]*><p class="demo-banner">/);
+});
+
+test("quantity controls are named groups, not labelled divs", async () => {
+  const html = await (await render("/headphones/xx99-mark-two-headphones")).text();
+  assert.match(html, /XX99 Mark II Headphones quantity/);
+  assert.doesNotMatch(html, /<div(?![^>]*\brole=)[^>]*aria-label=/);
+});
+
+test("checkout fields use single-line address autocomplete and no redundant label for", async () => {
+  const html = await (await render("/checkout")).text();
+  assert.match(html, /name="address"/);
+  assert.doesNotMatch(html, /autoComplete="street-address"|autocomplete="street-address"/);
+  assert.doesNotMatch(html, /<label[^>]*\bfor="[^"]*"[^>]*><span>[^<]*<\/span><input/);
+});

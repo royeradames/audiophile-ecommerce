@@ -16,7 +16,7 @@ export function AddToCart({ productId, productName }: { productId: string; produ
 
   return (
     <div className="add-to-cart-wrap">
-      <div className="quantity-control quantity-large" aria-label={`${productName} quantity`}>
+      <div className="quantity-control quantity-large" role="group" aria-label={`${productName} quantity`}>
         <button
           type="button"
           onClick={() => setQuantity((current) => Math.max(1, current - 1))}
