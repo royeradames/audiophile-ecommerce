@@ -18,7 +18,9 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event.deployment_status.state == 'success' &&
        github.event.deployment.environment == 'Preview')
-    runs-on: ubuntu-latest
+    # Light and secret-free, so it runs on the self-hosted Mac (no lane);
+    # CI_RUNNER=hosted moves it back to ubuntu-latest.
+    runs-on: ${{ vars.CI_RUNNER == 'hosted' && 'ubuntu-latest' || fromJSON('["self-hosted","macOS","royer-ci"]') }}
     timeout-minutes: 2
     outputs:
       run: ${{ steps.target.outputs.run }}

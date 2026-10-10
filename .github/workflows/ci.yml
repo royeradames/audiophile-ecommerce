@@ -1,0 +1,50 @@
+# The pull request gate: lint, then npm test (unit and PGlite regressions, the
+# Sites build and its HTML contracts, the Vercel build and the layout and
+# identity regression in Google Chrome). The hosted order journey stays in
+# hosted.yml, after each Preview deploy of the registered branch.
+#
+# Runner: Royer's self-hosted macOS runner on Mac2 (label royer-ci), because
+# GitHub-hosted jobs are refused by billing. The runner holds one heavy lane
+# for the whole job. The layout regression starts its own `next start` on a
+# free local port and stops it when it ends. Fallback: set the repository
+# variable CI_RUNNER to "hosted" to run on ubuntu-latest again; no workflow
+# change is needed.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ${{ vars.CI_RUNNER == 'hosted' && 'ubuntu-latest' || fromJSON('["self-hosted","macOS","royer-ci"]') }}
+    # Includes waiting for a free lane on the shared Mac.
+    timeout-minutes: 60
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.11.1
+          cache: ${{ runner.environment == 'github-hosted' && 'npm' || '' }}
+      - run: npm ci
+      - run: npm run lint
+      # Self-hosted Macs already have Google Chrome in /Applications.
+      - name: Install Chrome for the layout regression
+        if: runner.environment == 'github-hosted'
+        run: npx playwright install --with-deps chrome
+      - run: npm test
+        env:
+          PLAYWRIGHT_CHANNEL: chrome
