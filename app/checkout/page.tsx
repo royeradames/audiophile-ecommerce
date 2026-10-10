@@ -45,7 +45,7 @@ const fields = [
   { name: "name", label: "Name", type: "text", autoComplete: "name", placeholder: "Alex Morgan" },
   { name: "email", label: "Email address", type: "email", autoComplete: "email", placeholder: "alex@example.com" },
   { name: "phone", label: "Phone number", type: "tel", autoComplete: "tel", placeholder: "+1 202 555 0148" },
-  { name: "address", label: "Address", type: "text", autoComplete: "street-address", placeholder: "1137 Sound Avenue", wide: true },
+  { name: "address", label: "Address", type: "text", autoComplete: "address-line1", placeholder: "1137 Sound Avenue", wide: true },
   { name: "zip", label: "ZIP code", type: "text", autoComplete: "postal-code", placeholder: "10001" },
   { name: "city", label: "City", type: "text", autoComplete: "address-level2", placeholder: "New York" },
   { name: "country", label: "Country", type: "text", autoComplete: "country-name", placeholder: "United States" },
@@ -762,7 +762,7 @@ function FormField({
   const error = fieldErrorMessage(field.state.meta.errors);
 
   return (
-    <label className={`form-field ${spec.wide ? "field-wide" : ""}`} htmlFor={spec.name}>
+    <label className={`form-field ${spec.wide ? "field-wide" : ""}`}>
       <span>{spec.label}</span>
       <input
         id={spec.name}
