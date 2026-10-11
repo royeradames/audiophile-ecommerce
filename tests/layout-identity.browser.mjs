@@ -370,9 +370,15 @@ try {
     await emptyPage.setViewportSize({ width, height: 900 });
     await emptyPage.goto(base + "/checkout", { waitUntil: "networkidle" });
     await emptyPage.getByRole("heading", { name: "Your cart is empty" }).waitFor();
+    await emptyPage.evaluate(() => document.fonts.ready);
     for (const problem of await emptyPage.evaluate(wrappedLabels)) failures.push(`empty checkout @${width}: ${problem}`);
     await emptyPage.goto(base + "/", { waitUntil: "networkidle" });
-    await emptyPage.locator(".cart-button").click();
+    await emptyPage.evaluate(() => document.fonts.ready);
+    // A click before React hydrates does nothing, so retry until the dialog opens.
+    for (let attempt = 0; attempt < 10 && !(await emptyPage.locator(".cart-panel .empty-state").isVisible()); attempt += 1) {
+      await emptyPage.locator(".cart-button").click();
+      await emptyPage.locator(".cart-panel .empty-state").waitFor({ timeout: 1000 }).catch(() => {});
+    }
     await emptyPage.locator(".cart-panel .empty-state").waitFor();
     for (const problem of await emptyPage.evaluate(wrappedLabels)) failures.push(`empty cart @${width}: ${problem}`);
   }
