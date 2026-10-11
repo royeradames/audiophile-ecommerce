@@ -342,6 +342,47 @@ try {
     if (route !== "/" && identity.ogTitle === homeCard.title) failures.push(`${route}: share card reuses the home title`);
     if (route !== "/" && identity.ogDescription === homeCard.description) failures.push(`${route}: share card reuses the home description`);
   }
+  // Empty states (no saved cart): every button label keeps one line from 320 px (BTN8, principle 7).
+  // The October 11 audit found "Browse headphones" on two lines in the empty checkout at 320 to 340 px.
+  const empty = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const emptyPage = await empty.newPage();
+  const wrappedLabels = () => [...document.querySelectorAll("a.button, button")].flatMap((el) => {
+    const box = el.getBoundingClientRect();
+    if (!box.width || !box.height || getComputedStyle(el).visibility === "hidden") return [];
+    // Count text lines: a rect whose middle sits below the current line's bottom starts a new line,
+    // so an inline badge beside the label ("Cart 0") stays on the label's line.
+    const rects = [];
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      if (!walker.currentNode.textContent.trim()) continue;
+      const range = document.createRange();
+      range.selectNodeContents(walker.currentNode);
+      rects.push(...[...range.getClientRects()].filter((r) => r.width > 0));
+    }
+    rects.sort((a, b) => a.top - b.top);
+    let lines = 0, bottom = -Infinity;
+    for (const r of rects) {
+      if ((r.top + r.bottom) / 2 > bottom) { lines += 1; bottom = r.bottom; } else bottom = Math.max(bottom, r.bottom);
+    }
+    return lines > 1 ? [`"${el.textContent.trim().slice(0, 30)}" on ${lines} lines in a ${Math.round(box.width)}px button`] : [];
+  });
+  for (const width of [320, 330, 340, 350, 360, 370, 380, 390, 400, 768, 1920]) {
+    await emptyPage.setViewportSize({ width, height: 900 });
+    await emptyPage.goto(base + "/checkout", { waitUntil: "networkidle" });
+    await emptyPage.getByRole("heading", { name: "Your cart is empty" }).waitFor();
+    await emptyPage.evaluate(() => document.fonts.ready);
+    for (const problem of await emptyPage.evaluate(wrappedLabels)) failures.push(`empty checkout @${width}: ${problem}`);
+    await emptyPage.goto(base + "/", { waitUntil: "networkidle" });
+    await emptyPage.evaluate(() => document.fonts.ready);
+    // A click before React hydrates does nothing, so retry until the dialog opens.
+    for (let attempt = 0; attempt < 10 && !(await emptyPage.locator(".cart-panel .empty-state").isVisible()); attempt += 1) {
+      await emptyPage.locator(".cart-button").click();
+      await emptyPage.locator(".cart-panel .empty-state").waitFor({ timeout: 1000 }).catch(() => {});
+    }
+    await emptyPage.locator(".cart-panel .empty-state").waitFor();
+    for (const problem of await emptyPage.evaluate(wrappedLabels)) failures.push(`empty cart @${width}: ${problem}`);
+  }
+  await empty.close();
 } finally {
   await browser.close();
 }

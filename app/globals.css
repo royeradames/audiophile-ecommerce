@@ -2156,3 +2156,18 @@ legend {
 .checkout-intro .stack-hint {
   margin: 16px 0 0;
 }
+
+/* Narrowest phones: the empty-state card and its button give up side padding,
+   so "Browse headphones" keeps one line at 16 px (principle 7, BTN8). */
+@media (max-width: 359.98px) {
+  .narrow-empty,
+  .order-empty {
+    padding-inline: 12px;
+  }
+
+  .narrow-empty .button,
+  .empty-state .button,
+  .order-empty .button {
+    padding-inline: 16px;
+  }
+}
