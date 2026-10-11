@@ -38,7 +38,7 @@ export function OrderSummaryCard({ order, headingLevel = 3, linkToOrder = false 
           <dt>Total (USD)</dt>
           <dd>
             {formatPrice(order.grandTotal)}
-            <span>Includes {formatPrice(order.shipping)} demo shipping and {formatPrice(order.vat)} demo ITBIS 18%</span>
+            <span>Includes {formatPrice(order.shipping)} demo shipping and {formatPrice(order.vat)} demo VAT</span>
           </dd>
         </div>
         {order.payment === "in_person" && order.pickupCity ? (

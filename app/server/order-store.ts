@@ -172,7 +172,7 @@ export async function createOrder(pool: pg.Pool, input: NewOrder, customerId: st
         returning ${orderColumns}`,
       [
         newOrderId(), input.requestKey, customerId, initialStatus(input.payment), input.payment, input.pickupCity,
-        cents(priced.totals.subtotal), cents(priced.totals.shipping), cents(priced.totals.tax), priced.amountCents,
+        cents(priced.totals.subtotal), cents(priced.totals.shipping), cents(priced.totals.vat), priced.amountCents,
       ],
     );
     const row = inserted.rows[0];

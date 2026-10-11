@@ -54,7 +54,7 @@ try {
   });
   await page.route('**/api/stripe/payment-intent', async (route) => {
     requests.push({ path: 'payment-intent', body: route.request().postDataJSON() });
-    await route.fulfill({ json: { clientSecret: 'pi_synthetic_secret_fixture', amount: 3589 } });
+    await route.fulfill({ json: { clientSecret: 'pi_synthetic_secret_fixture', amount: 3049 } });
   });
   async function fillCheckout(payment) {
     await page.goto(`${base}/headphones/xx99-mark-two-headphones`);

@@ -37,14 +37,14 @@ for (const endpoint of endpoints) {
     assert.equal(response.status, 400);
   });
 
-  test(`${endpoint.name} charges catalog price plus unchanged demo shipping and tax`, async (t) => {
+  test(`${endpoint.name} charges the VAT-inclusive catalog price plus demo shipping`, async (t) => {
     testKeys(t);
     let stripeCalls = 0;
     t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
       stripeCalls += 1;
       assert.equal(url, endpoint.path === "checkout" ? "https://api.stripe.com/v1/checkout/sessions" : "https://api.stripe.com/v1/payment_intents");
       assert.ok(init.body instanceof URLSearchParams);
-      assert.equal(init.body.get(endpoint.path === "checkout" ? "line_items[0][price_data][unit_amount]" : "amount"), "358900");
+      assert.equal(init.body.get(endpoint.path === "checkout" ? "line_items[0][price_data][unit_amount]" : "amount"), "304900");
       if (endpoint.path === "checkout") {
         assert.equal(init.body.get("line_items[0][price_data][product_data][description]"), "1× XX99 MK II");
       }
@@ -55,7 +55,7 @@ for (const endpoint of endpoints) {
     }));
     assert.equal(response.status, 200);
     assert.equal(stripeCalls, 1);
-    if (endpoint.path === "payment-intent") assert.equal((await response.json()).amount, 3589);
+    if (endpoint.path === "payment-intent") assert.equal((await response.json()).amount, 3049);
   });
 }
 
@@ -65,12 +65,12 @@ test("browser payment clients send only the order ID and product quantities, nev
   t.mock.method(globalThis, "fetch", async (_url: string, init: RequestInit) => {
     assert.equal(typeof init.body, "string");
     assert.deepEqual(JSON.parse(String(init.body)), { orderId: requestBody.orderId, items: requestBody.items });
-    return Response.json({ url: "https://checkout.stripe.com/synthetic", clientSecret: "synthetic_secret", amount: 3589 });
+    return Response.json({ url: "https://checkout.stripe.com/synthetic", clientSecret: "synthetic_secret", amount: 3049 });
   });
   assert.equal((await startHostedCheckout(clientInput)).ok, true);
   const intent = await createPaymentIntent(clientInput);
   assert.equal(intent.ok, true);
-  if (intent.ok) assert.equal(intent.amount, 3589);
+  if (intent.ok) assert.equal(intent.amount, 3049);
 });
 
 for (const endpoint of endpoints) {

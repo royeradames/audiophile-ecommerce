@@ -20,7 +20,7 @@ const customer = {
   address: "1 Test Lane", zip: "10001", city: "Testville", country: "Dominican Republic",
 };
 const cart = [{ productId: "xx99-mark-two-headphones", quantity: 1 }];
-const TOTAL_CENTS = 358_900;
+const TOTAL_CENTS = 304_900; // XX99 $2,999 (20% VAT included) + $50 demo shipping
 
 async function withDatabase(t: TestContext) {
   const database = await startTestDatabase();

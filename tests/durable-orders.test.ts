@@ -19,7 +19,7 @@ const customer = {
   address: "1 Test Lane", zip: "10001", city: "Testville", country: "Testland",
 };
 const cart = [{ productId: "xx99-mark-two-headphones", quantity: 1 }];
-const XX99_TOTAL_CENTS = 358_900; // $2,999 + $50 demo shipping + $540 demo ITBIS (18%)
+const XX99_TOTAL_CENTS = 304_900; // $2,999 (20% VAT included) + $50 demo shipping
 
 function keys(t: TestContext) {
   const previous = { ...process.env };
@@ -76,7 +76,7 @@ test("an order is created from server prices, ignoring any browser total", async
   const { order } = created.body;
   assert.match(order.id, /^AUD-[0-9A-HJKMNP-TV-Z]{10}$/);
   assert.equal(order.status, "pending_hosted");
-  assert.deepEqual([order.subtotal, order.shipping, order.vat, order.grandTotal], [5998, 50, 1080, 7128]);
+  assert.deepEqual([order.subtotal, order.shipping, order.vat, order.grandTotal], [5998, 50, 1200, 6048]);
   assert.equal(order.savedToAccount, false);
   const { rows } = await database.query(`select "total_cents", "customer_id" from "audiophile_orders"`);
   assert.deepEqual(rows, [{ total_cents: 712_800, customer_id: null }]);
@@ -305,7 +305,7 @@ test("a paid order reads back after a restart without its private details", asyn
   assert.equal(response.status, 200);
   const { order } = await response.json();
   assert.equal(order.status, "paid");
-  assert.equal(order.grandTotal, 3589);
+  assert.equal(order.grandTotal, 3049);
   for (const field of ["email", "address", "phone", "customerId", "customer_name", "totalCents"]) {
     assert.equal(field in order, false, `${field} stays private`);
   }
