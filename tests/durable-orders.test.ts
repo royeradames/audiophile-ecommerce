@@ -19,7 +19,7 @@ const customer = {
   address: "1 Test Lane", zip: "10001", city: "Testville", country: "Testland",
 };
 const cart = [{ productId: "xx99-mark-two-headphones", quantity: 1 }];
-const XX99_TOTAL_CENTS = 358_900; // $2,999 + $50 demo shipping + $540 demo ITBIS (18%)
+const XX99_TOTAL_CENTS = 304_900; // $2,999 (20% VAT included) + $50 demo shipping
 
 function keys(t: TestContext) {
   const previous = { ...process.env };
@@ -76,15 +76,33 @@ test("an order is created from server prices, ignoring any browser total", async
   const { order } = created.body;
   assert.match(order.id, /^AUD-[0-9A-HJKMNP-TV-Z]{10}$/);
   assert.equal(order.status, "pending_hosted");
-  assert.deepEqual([order.subtotal, order.shipping, order.vat, order.grandTotal], [5998, 50, 1080, 7128]);
+  assert.deepEqual([order.subtotal, order.shipping, order.vat, order.grandTotal], [5998, 50, 1200, 6048]);
   assert.equal(order.savedToAccount, false);
-  const { rows } = await database.query(`select "total_cents", "customer_id" from "audiophile_orders"`);
-  assert.deepEqual(rows, [{ total_cents: 712_800, customer_id: null }]);
+  // Stored pre-tax, so the table's total = subtotal + shipping + tax check holds with VAT included in prices.
+  const { rows } = await database.query(`select "subtotal_cents", "shipping_cents", "tax_cents", "total_cents", "customer_id" from "audiophile_orders"`);
+  assert.deepEqual(rows, [{ subtotal_cents: 479_800, shipping_cents: 5_000, tax_cents: 120_000, total_cents: 604_800, customer_id: null }]);
 
   const forged = await placeOrder({ total: 1 });
   assert.equal(forged.status, 400, "Unknown fields such as a browser total are refused");
   const unknown = await placeOrder({ items: [{ productId: "not-in-catalog", quantity: 1 }] });
   assert.equal(unknown.status, 400);
+});
+
+test("orders read back with their real product subtotal, VAT-inclusive or older ITBIS on top", async (t) => {
+  const database = await withDatabase(t);
+  const created = await placeOrder();
+  // An order saved before the VAT change: $2,999 of products with 18% ITBIS added on top.
+  await database.query(`insert into "audiophile_orders" ("id", "request_key", "status", "payment_method",
+      "subtotal_cents", "shipping_cents", "tax_cents", "total_cents")
+    values ('AUD-0000000003', gen_random_uuid(), 'pending_hosted', 'element', 299900, 5000, 54000, 358900)`);
+  await database.query(`insert into "audiophile_order_items" ("order_id", "product_id", "name", "quantity", "unit_price_cents", "position")
+    values ('AUD-0000000003', 'xx99-mark-two-headphones', 'XX99 MK II', 1, 299900, 0)`);
+  const read = async (orderId: string) => (await (await orderRoute.GET(
+    new Request(`http://localhost/api/orders/${orderId}`), { params: Promise.resolve({ orderId }) })).json()).order;
+  const vatIncluded = await read(created.body.order.id);
+  assert.deepEqual([vatIncluded.subtotal, vatIncluded.shipping, vatIncluded.vat, vatIncluded.grandTotal], [2999, 50, 600, 3049]);
+  const itbisOnTop = await read("AUD-0000000003");
+  assert.deepEqual([itbisOnTop.subtotal, itbisOnTop.shipping, itbisOnTop.vat, itbisOnTop.grandTotal], [2999, 50, 540, 3589]);
 });
 
 test("submitting the same checkout twice keeps a single order", async (t) => {
@@ -305,7 +323,7 @@ test("a paid order reads back after a restart without its private details", asyn
   assert.equal(response.status, 200);
   const { order } = await response.json();
   assert.equal(order.status, "paid");
-  assert.equal(order.grandTotal, 3589);
+  assert.equal(order.grandTotal, 3049);
   for (const field of ["email", "address", "phone", "customerId", "customer_name", "totalCents"]) {
     assert.equal(field in order, false, `${field} stays private`);
   }

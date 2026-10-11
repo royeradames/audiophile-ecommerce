@@ -30,7 +30,7 @@ const draft: OrderDraft = {
   subtotal: 2999,
   shipping: 50,
   vat: 600,
-  grandTotal: 3649,
+  grandTotal: 3049,
 };
 
 test("maps each checkout method to a pending status", () => {
@@ -46,7 +46,7 @@ test("buildOrder starts unpaid with a pending status", () => {
   assert.equal(order.id, "AUD-TEST");
   assert.equal(order.status, "pending_transfer");
   assert.equal(order.settledAt, null);
-  assert.equal(order.grandTotal, 3649);
+  assert.equal(order.grandTotal, 3049);
 });
 
 test("markPaid settles hosted and transfer orders only", () => {

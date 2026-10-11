@@ -268,7 +268,7 @@ export default function CheckoutPage() {
       }),
     [items],
   );
-  const { subtotal, shipping, tax, grandTotal } = checkoutTotals(
+  const { subtotal, shipping, vat, grandTotal } = checkoutTotals(
     detailedItems.reduce((sum, line) => sum + line.product.price * line.quantity, 0),
   );
   const formattedTotal = formatUsd(grandTotal);
@@ -338,7 +338,7 @@ export default function CheckoutPage() {
           })),
           subtotal,
           shipping,
-          vat: tax,
+          vat,
           grandTotal,
         });
         addOrder(order);
@@ -427,9 +427,9 @@ export default function CheckoutPage() {
               <p className="overline overline-accent">Learning shop</p>
               <h1 id="checkout-title">Checkout</h1>
               <p>
-                Catalog prices are USD. Shipping and 18% ITBIS are demo figures,
-                not a live tax or FX quote. Hosted card and own card form use
-                Stripe test mode when keys are on the server. DR bank transfer
+                Catalog prices are USD and include 20% VAT. Shipping and VAT
+                are demo figures, not a live tax or FX quote. Hosted card and
+                own card form use Stripe test mode when keys are on the server. DR bank transfer
                 and Zelle stay unpaid until matched by hand. Pay in person uses
                 a dedicated AZUL terminal in the Dominican Republic. Payee
                 details come from the <Link href="/payments">payment stack</Link>.
@@ -587,7 +587,7 @@ export default function CheckoutPage() {
                 <dl className="totals">
                   <div><dt>Subtotal (USD)</dt><dd>{formatUsd(subtotal)}</dd></div>
                   <div><dt>Demo shipping (USD)</dt><dd>{formatUsd(shipping)}</dd></div>
-                  <div><dt>Demo ITBIS 18% (USD)</dt><dd>{formatUsd(tax)}</dd></div>
+                  <div><dt>Demo VAT 20%, included (USD)</dt><dd>{formatUsd(vat)}</dd></div>
                   <div className="grand-total"><dt>Grand total (USD)</dt><dd>{formatUsd(grandTotal)}</dd></div>
                 </dl>
                 <p className="stack-hint">

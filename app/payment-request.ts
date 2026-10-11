@@ -27,7 +27,7 @@ export type PricedLine = { productId: string; name: string; quantity: number; un
 
 /**
  * Prices a cart from the server catalog: whole-dollar prices, the flat demo
- * shipping fee and the 18% demo ITBIS. The browser never supplies a price.
+ * shipping fee, with the brief's 20% VAT included. The browser never supplies a price.
  */
 export function priceCart(items: CartItems) {
   const seen = new Set<string>();

@@ -35,7 +35,7 @@ test("a guest order is saved before payment, paid once with a Stripe test card, 
   expect(createdResponse.status()).toBe(201);
   const { order } = await createdResponse.json();
   rememberOrder(order.id);
-  expect(order.grandTotal, "Server total: $2,999 + $50 demo shipping + $540 demo ITBIS 18%").toBe(3589);
+  expect(order.grandTotal, "Server total: $2,999 with 20% VAT included + $50 demo shipping").toBe(3049);
   await expect(page.getByRole("heading", { name: `Order ${order.id}`, exact: true })).toBeVisible();
   const intentId = String((await (await firstIntent).json()).clientSecret).split("_secret_")[0];
   expect(intentId).toMatch(/^pi_/);

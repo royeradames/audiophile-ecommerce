@@ -18,7 +18,7 @@ test("a paid order is still listed after the server restarts", async (t) => {
   // has that route. The original build accepted any AUD- id from Stripe.
   const orders = await import("../app/api/orders/route.ts").catch(() => null);
   let orderId = "AUD-RESTART";
-  let amount = 358_900;
+  let amount = 304_900;
   if (orders) {
     const created = await orders.POST(new Request("http://localhost/api/orders", {
       method: "POST",

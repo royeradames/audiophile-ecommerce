@@ -32,10 +32,10 @@ Order ids look like `AUD-XXXX`. Status labels on `/orders`: Pending card, Pendin
 Catalog prices are USD.
 
 - Demo shipping: **$50** when the cart is not empty
-- Demo ITBIS: **18%** of subtotal (not UK VAT, not a live filing)
+- Demo VAT: **20%** of the product total, excluding shipping, and already included in the prices (the Frontend Mentor brief's rule; not a live filing). Orders placed before October 11, 2026 used an 18% ITBIS added on top and keep their stored totals. The database stores every order's subtotal before tax, so `total = subtotal + shipping + tax` holds for both; saved-order cards say "demo tax" because older orders carry ITBIS.
 - Demo FX: **60 DOP / USD**, labeled as demo, not a live quote
 
-Example: XX99 Mark II at $2,999 → shipping $50 + tax $540 → **$3,589** USD. Demo DOP should mention 60.
+Example: XX99 Mark II at $2,999 (VAT $600 included) + shipping $50 → **$3,049** USD. The brief's design cart: $5,396 + $50 → **$5,446**, VAT $1,079 included. Demo DOP should mention 60.
 
 ## 0. Automated (every pass)
 

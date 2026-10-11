@@ -95,7 +95,7 @@ test("keeps state, privacy, accessibility, and legibility contracts explicit", a
   assert.match(checkout, /Zelle/);
   assert.match(checkout, /Pay in person/);
   assert.match(checkout, /hosted card/i);
-  assert.match(checkout, /Demo ITBIS/);
+  assert.match(checkout, /Demo VAT 20%, included/);
   assert.match(checkout, /startHostedCheckout/);
   assert.match(checkout, /CardPayment/);
   assert.match(checkout, /createOrderId/);
@@ -137,7 +137,7 @@ test("keeps state, privacy, accessibility, and legibility contracts explicit", a
   const webhook = await readFile(new URL("../app/stripe-webhook.ts", import.meta.url), "utf8");
   const totals = await readFile(new URL("../app/checkout-totals.ts", import.meta.url), "utf8");
   assert.match(webhook, /verifyStripeWebhookSignature/);
-  assert.match(totals, /DEMO_ITBIS_RATE/);
+  assert.match(totals, /VAT_RATE = 0.2;/);
   assert.match(paymentsPage, /persona física/);
   const stripeReturn = await readFile(new URL("../app/checkout/stripe/page.tsx", import.meta.url), "utf8");
   assert.match(stripeReturn, /fetchStripePaymentIntent/);

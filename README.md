@@ -43,7 +43,7 @@ The project uses Next.js App Router source with two build targets: native Next.j
 
 ## Durable orders
 
-`POST /api/orders` saves the order (server totals, 18% demo ITBIS) before payment. A request key makes a retried submission return the same order. Payment status is stored per Stripe PaymentIntent in `audiophile_payments`; the webhook (`/api/stripe/webhook`, each event handled once) and the return/confirmation routes settle the order idempotently, and only for the stored amount. A card retry reuses the open PaymentIntent. `GET /api/orders/<id>` returns the order status without address or email, so a confirmation link works in any browser.
+`POST /api/orders` saves the order (server totals, with the brief's 20% demo VAT included in the prices) before payment. A request key makes a retried submission return the same order. Payment status is stored per Stripe PaymentIntent in `audiophile_payments`; the webhook (`/api/stripe/webhook`, each event handled once) and the return/confirmation routes settle the order idempotently, and only for the stored amount. A card retry reuses the open PaymentIntent. `GET /api/orders/<id>` returns the order status without address or email, so a confirmation link works in any browser.
 
 Migrations live in `migrations/`, are idempotent, and are recorded with their SHA-256. Review the plan, then apply it to one named Neon database:
 

@@ -1,11 +1,13 @@
 export const DEMO_SHIPPING_USD = 50;
-export const DEMO_ITBIS_RATE = 0.18;
+/** The brief's VAT rate. Catalog prices already include it. */
+export const VAT_RATE = 0.2;
 export const DEMO_USD_TO_DOP = 60;
 
 export type CheckoutTotals = {
   subtotal: number;
   shipping: number;
-  tax: number;
+  /** The VAT inside the subtotal, shown for information; never added on top. */
+  vat: number;
   grandTotal: number;
 };
 
@@ -18,18 +20,19 @@ export function formatUsd(value: number) {
 }
 
 /**
- * Demo checkout math. Catalog prices are USD. Shipping is a flat demo fee.
- * Tax is 18% shaped like DR ITBIS, not a live filing or US sales tax.
+ * Demo checkout math from the Frontend Mentor brief. Catalog prices are USD
+ * and include VAT, which is 20% of the product total, excluding shipping.
+ * Shipping is a flat demo fee. Grand total = products + shipping. Neither
+ * figure is a live tax filing.
  */
 export function checkoutTotals(subtotal: number): CheckoutTotals {
   const safeSubtotal = subtotal > 0 ? subtotal : 0;
   const shipping = safeSubtotal > 0 ? DEMO_SHIPPING_USD : 0;
-  const tax = Math.round(safeSubtotal * DEMO_ITBIS_RATE);
   return {
     subtotal: safeSubtotal,
     shipping,
-    tax,
-    grandTotal: safeSubtotal + shipping + tax,
+    vat: Math.round(safeSubtotal * VAT_RATE),
+    grandTotal: safeSubtotal + shipping,
   };
 }
 
