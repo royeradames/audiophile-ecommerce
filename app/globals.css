@@ -1666,9 +1666,16 @@ legend {
     display: flex;
   }
 
+  /* Tablet - Home in Figma: the hero ends 729 px down the page and its copy
+     starts at 216 px. Header (93) and demo notice (42) come first here, so the
+     hero is 594 px and the copy starts 81 px into it. */
   .hero,
   .hero-inner {
-    min-height: 670px;
+    min-height: 594px;
+  }
+
+  .hero-inner {
+    align-items: flex-start;
   }
 
   .hero {
@@ -1678,7 +1685,24 @@ legend {
 
   .hero-copy {
     margin-inline: auto;
+    padding-block: 79px 0;
     text-align: center;
+  }
+
+  .hero .overline {
+    margin-bottom: 25px;
+  }
+
+  .hero-copy h1 {
+    margin-bottom: 20px;
+    font-size: 3.5rem; /* design: 56/58 on tablet */
+    line-height: 58px;
+  }
+
+  .hero-description {
+    max-width: 349px;
+    margin-bottom: 40px;
+    line-height: 25px;
   }
 
   .hero-copy h1,
@@ -1828,9 +1852,11 @@ legend {
     flex-direction: column;
   }
 
+  /* Mobile - Home in Figma: the hero ends at 600 px and its copy starts at
+     198 px. Header (81) and the two-line demo notice (65) come first here. */
   .hero,
   .hero-inner {
-    min-height: 590px;
+    min-height: 454px;
   }
 
   .hero {
@@ -1838,11 +1864,22 @@ legend {
   }
 
   .hero-copy {
-    padding-top: 120px;
+    padding-block: 50px 0;
+  }
+
+  .hero .overline {
+    margin-bottom: 13px;
   }
 
   .hero-copy h1 {
-    font-size: clamp(2.45rem, 13vw, 3.3rem);
+    margin-bottom: 24px;
+    font-size: 2.25rem; /* design: 36/40 on mobile */
+    line-height: 40px;
+  }
+
+  .hero-description {
+    max-width: 328px;
+    margin-bottom: 28px;
   }
 
   .overline {

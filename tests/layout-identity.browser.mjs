@@ -281,6 +281,25 @@ try {
   await page.locator("header .wordmark").focus();
   for (const problem of await headerTabOrder(page)) failures.push(`desktop header @1280: ${problem}`);
 
+  // The home hero copy sits where the Figma Mobile - Home and Tablet - Home frames put it:
+  // the top of each text within 12 px, measured on the page like the design audit does.
+  const heroDesign = {
+    375: { ".hero .overline": 198, ".hero h1": 233, ".hero-description": 337, ".hero .button": 455 },
+    768: { ".hero .overline": 216, ".hero h1": 259, ".hero-description": 399, ".hero .button": 529 },
+  };
+  for (const [width, expected] of Object.entries(heroDesign)) {
+    await page.setViewportSize({ width: Number(width), height: 1400 });
+    await page.goto(base + "/", { waitUntil: "networkidle" });
+    const tops = await page.evaluate((selectors) => Object.fromEntries(selectors.map((selector) => {
+      const range = document.createRange();
+      range.selectNodeContents(document.querySelector(selector));
+      return [selector, Math.round(range.getBoundingClientRect().top + scrollY)];
+    })), Object.keys(expected));
+    for (const [selector, top] of Object.entries(expected)) {
+      if (Math.abs(tops[selector] - top) > 12) failures.push(`home hero @${width}: ${selector} text starts at ${tops[selector]}px, design ${top}px`);
+    }
+  }
+
   const homeCard = {};
   // Transactional and owner pages stay out of search and have no card of their own.
   const privateRoutes = new Set(["/payments", "/zelle", "/checkout", "/orders", "/account"]);
