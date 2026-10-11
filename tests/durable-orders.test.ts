@@ -78,8 +78,9 @@ test("an order is created from server prices, ignoring any browser total", async
   assert.equal(order.status, "pending_hosted");
   assert.deepEqual([order.subtotal, order.shipping, order.vat, order.grandTotal], [5998, 50, 1200, 6048]);
   assert.equal(order.savedToAccount, false);
-  const { rows } = await database.query(`select "total_cents", "customer_id" from "audiophile_orders"`);
-  assert.deepEqual(rows, [{ total_cents: 712_800, customer_id: null }]);
+  // Stored pre-tax, so the table's total = subtotal + shipping + tax check holds with VAT included in prices.
+  const { rows } = await database.query(`select "subtotal_cents", "shipping_cents", "tax_cents", "total_cents", "customer_id" from "audiophile_orders"`);
+  assert.deepEqual(rows, [{ subtotal_cents: 479_800, shipping_cents: 5_000, tax_cents: 120_000, total_cents: 604_800, customer_id: null }]);
 
   const forged = await placeOrder({ total: 1 });
   assert.equal(forged.status, 400, "Unknown fields such as a browser total are refused");

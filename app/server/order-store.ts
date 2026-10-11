@@ -72,7 +72,8 @@ function toStored(row: OrderRow, items: ItemRow[]): StoredOrder {
       quantity: item.quantity,
       unitPrice: item.unit_price_cents / 100,
     })),
-    subtotal: row.subtotal_cents / 100,
+    // Stored pre-tax; the app's subtotal is what the products cost with tax in it.
+    subtotal: (row.subtotal_cents + row.tax_cents) / 100,
     shipping: row.shipping_cents / 100,
     vat: row.tax_cents / 100,
     grandTotal: row.total_cents / 100,
@@ -157,6 +158,11 @@ function sameSubmission(existing: StoredOrder, input: NewOrder, customerId: stri
  * Retrying the same submission (same request key) returns the same order.
  * The request carries no personal details at all: name, email, phone and
  * address stay in the shopper's browser (demo store).
+ *
+ * Prices include VAT, but `subtotal_cents` is stored before tax, so the
+ * table's check total = subtotal + shipping + tax holds. Orders saved under
+ * the older 18% ITBIS (added on top) were already stored that way, so one
+ * read rule serves both.
  */
 export async function createOrder(pool: pg.Pool, input: NewOrder, customerId: string | null): Promise<CreateOrderResult> {
   const priced = priceCart(input.items);
@@ -172,7 +178,7 @@ export async function createOrder(pool: pg.Pool, input: NewOrder, customerId: st
         returning ${orderColumns}`,
       [
         newOrderId(), input.requestKey, customerId, initialStatus(input.payment), input.payment, input.pickupCity,
-        cents(priced.totals.subtotal), cents(priced.totals.shipping), cents(priced.totals.vat), priced.amountCents,
+        cents(priced.totals.subtotal) - cents(priced.totals.vat), cents(priced.totals.shipping), cents(priced.totals.vat), priced.amountCents,
       ],
     );
     const row = inserted.rows[0];
