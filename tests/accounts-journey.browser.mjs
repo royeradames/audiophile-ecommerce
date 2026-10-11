@@ -174,7 +174,7 @@ try {
   if (await country.count()) await country.selectOption("US");
   const postal = stripe.locator('[name="postalCode"]');
   if (await postal.count()) await postal.fill(card.postal);
-  await alice.page.getByRole("button", { name: "Pay $3,589 (Stripe test)" }).click();
+  await alice.page.getByRole("button", { name: "Pay $3,049 (Stripe test)" }).click();
   await alice.page.getByText("Stripe test payment recorded. This is not a live merchant charge.").waitFor({ timeout: 60_000 });
   log(`Order ${orderId} was created on the server and paid with Stripe's test card.`);
 

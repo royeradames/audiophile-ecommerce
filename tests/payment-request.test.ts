@@ -131,7 +131,7 @@ for (const endpoint of endpoints) {
     testKeys(t);
     const fetchMock = t.mock.method(globalThis, "fetch", async (_url: string, init: RequestInit) => {
       assert.ok(init.body instanceof URLSearchParams);
-      assert.equal(init.body.get(endpoint.path === "checkout" ? "line_items[0][price_data][unit_amount]" : "amount"), "252400");
+      assert.equal(init.body.get(endpoint.path === "checkout" ? "line_items[0][price_data][unit_amount]" : "amount"), "214700"); // 2 × $599 + $899 (VAT included) + $50 shipping
       return Response.json({ url: "https://checkout.stripe.com/synthetic", client_secret: "synthetic_secret" });
     });
     const makeRequest = () => new Request("https://shop.example", {

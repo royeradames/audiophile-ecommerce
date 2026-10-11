@@ -88,6 +88,23 @@ test("an order is created from server prices, ignoring any browser total", async
   assert.equal(unknown.status, 400);
 });
 
+test("orders read back with their real product subtotal, VAT-inclusive or older ITBIS on top", async (t) => {
+  const database = await withDatabase(t);
+  const created = await placeOrder();
+  // An order saved before the VAT change: $2,999 of products with 18% ITBIS added on top.
+  await database.query(`insert into "audiophile_orders" ("id", "request_key", "status", "payment_method",
+      "subtotal_cents", "shipping_cents", "tax_cents", "total_cents")
+    values ('AUD-0000000003', gen_random_uuid(), 'pending_hosted', 'element', 299900, 5000, 54000, 358900)`);
+  await database.query(`insert into "audiophile_order_items" ("order_id", "product_id", "name", "quantity", "unit_price_cents", "position")
+    values ('AUD-0000000003', 'xx99-mark-two-headphones', 'XX99 MK II', 1, 299900, 0)`);
+  const read = async (orderId: string) => (await (await orderRoute.GET(
+    new Request(`http://localhost/api/orders/${orderId}`), { params: Promise.resolve({ orderId }) })).json()).order;
+  const vatIncluded = await read(created.body.order.id);
+  assert.deepEqual([vatIncluded.subtotal, vatIncluded.shipping, vatIncluded.vat, vatIncluded.grandTotal], [2999, 50, 600, 3049]);
+  const itbisOnTop = await read("AUD-0000000003");
+  assert.deepEqual([itbisOnTop.subtotal, itbisOnTop.shipping, itbisOnTop.vat, itbisOnTop.grandTotal], [2999, 50, 540, 3589]);
+});
+
 test("submitting the same checkout twice keeps a single order", async (t) => {
   const database = await withDatabase(t);
   const requestKey = crypto.randomUUID();

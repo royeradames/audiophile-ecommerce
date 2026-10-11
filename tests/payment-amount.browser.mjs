@@ -86,7 +86,7 @@ try {
   results.push('Saved hosted retry discards forged browser prices, total, and description.');
 
   await fillCheckout('element');
-  await page.getByRole('button', { name: 'Pay $3,589 (Stripe test)', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Pay $3,049 (Stripe test)', exact: true }).waitFor();
   assert.equal(await page.evaluate(() => window.paymentElementOptions.at(-1)?.defaultValues?.billingDetails?.email), 'synthetic@example.invalid');
   results.push('Initial own-card form sends products, displays the server-returned total and passes the known email to Stripe.');
   const records = await page.evaluate(() => JSON.parse(localStorage.getItem('audiophile-orders-v1')));
@@ -95,7 +95,7 @@ try {
   const forgedCard = { ...cardOrder, grandTotal: 1, lines: cardOrder.lines.map((line) => ({ ...line, unitPrice: 1 })) };
   await page.evaluate((order) => localStorage.setItem('audiophile-orders-v1', JSON.stringify([order])), forgedCard);
   await page.goto(`${base}/checkout/pay?order=${encodeURIComponent(cardOrder.id)}`);
-  await page.getByRole('button', { name: 'Pay $3,589 (Stripe test)', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Pay $3,049 (Stripe test)', exact: true }).waitFor();
   assert.equal(await page.evaluate(() => window.paymentElementOptions.at(-1)?.defaultValues?.billingDetails?.email), 'synthetic@example.invalid');
   assert.equal(await page.getByRole('button', { name: 'Pay $1 (Stripe test)', exact: true }).count(), 0);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('audiophile-orders-v1')));

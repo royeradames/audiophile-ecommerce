@@ -72,8 +72,11 @@ function toStored(row: OrderRow, items: ItemRow[]): StoredOrder {
       quantity: item.quantity,
       unitPrice: item.unit_price_cents / 100,
     })),
-    // Stored pre-tax; the app's subtotal is what the products cost with tax in it.
-    subtotal: (row.subtotal_cents + row.tax_cents) / 100,
+    // What the products cost, from the lines. The stored subtotal is before tax:
+    // VAT-inclusive orders keep the tax out of it, older ITBIS orders added tax on top.
+    subtotal: (items.length
+      ? items.reduce((sum, item) => sum + item.unit_price_cents * item.quantity, 0)
+      : row.subtotal_cents + row.tax_cents) / 100,
     shipping: row.shipping_cents / 100,
     vat: row.tax_cents / 100,
     grandTotal: row.total_cents / 100,
@@ -159,10 +162,11 @@ function sameSubmission(existing: StoredOrder, input: NewOrder, customerId: stri
  * The request carries no personal details at all: name, email, phone and
  * address stay in the shopper's browser (demo store).
  *
- * Prices include VAT, but `subtotal_cents` is stored before tax, so the
- * table's check total = subtotal + shipping + tax holds. Orders saved under
- * the older 18% ITBIS (added on top) were already stored that way, so one
- * read rule serves both.
+ * Prices include VAT, so `subtotal_cents` is stored as the products minus
+ * their VAT and the table's check total = subtotal + shipping + tax holds.
+ * Orders saved under the older 18% ITBIS stored the full product price with
+ * the tax on top; reads take the subtotal from the order lines, which is
+ * right for both.
  */
 export async function createOrder(pool: pg.Pool, input: NewOrder, customerId: string | null): Promise<CreateOrderResult> {
   const priced = priceCart(input.items);
