@@ -290,13 +290,17 @@ try {
   for (const [width, expected] of Object.entries(heroDesign)) {
     await page.setViewportSize({ width: Number(width), height: 1400 });
     await page.goto(base + "/", { waitUntil: "networkidle" });
+    await page.evaluate(() => document.fonts.ready);
     const tops = await page.evaluate((selectors) => Object.fromEntries(selectors.map((selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return [selector, null];
       const range = document.createRange();
-      range.selectNodeContents(document.querySelector(selector));
+      range.selectNodeContents(element);
       return [selector, Math.round(range.getBoundingClientRect().top + scrollY)];
     })), Object.keys(expected));
     for (const [selector, top] of Object.entries(expected)) {
-      if (Math.abs(tops[selector] - top) > 12) failures.push(`home hero @${width}: ${selector} text starts at ${tops[selector]}px, design ${top}px`);
+      if (tops[selector] === null) failures.push(`home hero @${width}: ${selector} is missing`);
+      else if (Math.abs(tops[selector] - top) > 12) failures.push(`home hero @${width}: ${selector} text starts at ${tops[selector]}px, design ${top}px`);
     }
   }
 

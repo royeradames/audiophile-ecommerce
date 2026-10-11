@@ -1680,7 +1680,8 @@ legend {
 
   .hero {
     background-image: linear-gradient(rgb(0 0 0 / 0.34), rgb(0 0 0 / 0.34)), url("/images/home/tablet/image-hero.jpg");
-    background-position: center;
+    /* The design's header sits over the top of this image; keep its bottom, the ear cups, in view. */
+    background-position: center bottom;
   }
 
   .hero-copy {
@@ -1696,13 +1697,13 @@ legend {
   .hero-copy h1 {
     margin-bottom: 20px;
     font-size: 3.5rem; /* design: 56/58 on tablet */
-    line-height: 58px;
+    line-height: 1.036;
   }
 
   .hero-description {
     max-width: 349px;
     margin-bottom: 40px;
-    line-height: 25px;
+    line-height: 1.47; /* design: 25 px at 17 px */
   }
 
   .hero-copy h1,
@@ -1861,6 +1862,7 @@ legend {
 
   .hero {
     background-image: linear-gradient(rgb(0 0 0 / 0.36), rgb(0 0 0 / 0.36)), url("/images/home/mobile/image-hero.jpg");
+    background-position: center bottom;
   }
 
   .hero-copy {
@@ -1874,7 +1876,7 @@ legend {
   .hero-copy h1 {
     margin-bottom: 24px;
     font-size: 2.25rem; /* design: 36/40 on mobile */
-    line-height: 40px;
+    line-height: 1.111;
   }
 
   .hero-description {
