@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { testCardHint } from "./demo-store";
 import type { PaymentMethod } from "./payment-methods";
 import type { PayeeSettings } from "./payee-settings";
 import { ZelleQr, zellePageHref } from "./zelle-qr";
+import { useCopyFeedback } from "./use-copy-feedback";
 
 export function PaymentInstructions({
   method,
@@ -136,25 +136,18 @@ function InstructionList({ rows }: { rows: Array<{ label: string; value: string 
   );
 }
 
+// Every press shows and announces something new; a blocked copy says so (catalog CPY1).
+// The visible text starts the name, so voice control can say "Copy" (catalog BTN5).
 function CopyButton({ label, value }: { label: string; value: string }) {
-  const [copied, setCopied] = useState(false);
+  const copy = useCopyFeedback();
 
   return (
-    <button
-      type="button"
-      className="copy-button"
-      aria-label={`Copy ${label}`}
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(value);
-          setCopied(true);
-          window.setTimeout(() => setCopied(false), 1600);
-        } catch {
-          setCopied(false);
-        }
-      }}
-    >
-      {copied ? "Copied" : "Copy"}
-    </button>
+    <>
+      <button type="button" className="copy-button" data-copy-state={copy.state} onClick={() => void copy.copy(value, label)}>
+        {copy.state === "idle" ? "Copy" : copy.label}
+        <span className="sr-only"> {label}</span>
+      </button>
+      <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">{copy.message}</span>
+    </>
   );
 }
