@@ -120,7 +120,9 @@ test("keeps state, privacy, accessibility, and legibility contracts explicit", a
   assert.doesNotMatch(paymentsPage, /AUD-TEST/);
   assert.match(paymentsPage, /aria-live="polite"/);
   assert.match(checkout, /querySelectorAll/);
-  assert.match(instructions, /aria-label=\{`Copy \$\{label\}`\}/);
+  // The visible "Copy" starts each button's name, and the row label follows it (BTN5, CPY1).
+  assert.match(instructions, /aria-label=\{`\$\{visible\} \$\{label\}`\}/);
+  assert.match(instructions, /role="status" aria-live="polite"/);
   assert.doesNotMatch(shell, /href="\/orders"/);
   const zelle = await readFile(new URL("../app/zelle/page.tsx", import.meta.url), "utf8");
   assert.match(zelle, /Pay with Zelle/);

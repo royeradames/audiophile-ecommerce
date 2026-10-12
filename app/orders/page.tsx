@@ -15,6 +15,7 @@ import {
 import { paymentMethodLabels, pickupCityLabels } from "../payment-methods";
 import { fetchPaidOrderIds } from "../stripe-client";
 import type { StaffAccess } from "../staff-session";
+import { useCopyFeedback } from "../use-copy-feedback";
 
 export default function OrdersPage() {
   const { orders, markPaid, markCollected, cancelOrder } = useOrders();
@@ -332,24 +333,16 @@ function OrderCard({
   );
 }
 
+// Every press shows and announces something new; a blocked copy says so (catalog CPY1).
 function CopyButton({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
+  const copy = useCopyFeedback();
 
   return (
-    <button
-      type="button"
-      className="copy-button"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(value);
-          setCopied(true);
-          window.setTimeout(() => setCopied(false), 1600);
-        } catch {
-          setCopied(false);
-        }
-      }}
-    >
-      {copied ? "Copied" : "Copy ID"}
-    </button>
+    <>
+      <button type="button" className="copy-button" data-copy-state={copy.state} onClick={() => void copy.copy(value, `order ID ${value}`)}>
+        {copy.state === "idle" ? "Copy ID" : copy.label}
+      </button>
+      <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">{copy.message}</span>
+    </>
   );
 }
