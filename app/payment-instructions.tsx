@@ -137,15 +137,15 @@ function InstructionList({ rows }: { rows: Array<{ label: string; value: string 
 }
 
 // Every press shows and announces something new; a blocked copy says so (catalog CPY1).
-// The visible text starts the name, so voice control can say "Copy" (catalog BTN5).
+// The name is the visible text plus the row, so voice control can say "Copy" (catalog BTN5).
 function CopyButton({ label, value }: { label: string; value: string }) {
   const copy = useCopyFeedback();
+  const visible = copy.state === "idle" ? "Copy" : copy.label;
 
   return (
     <>
-      <button type="button" className="copy-button" data-copy-state={copy.state} onClick={() => void copy.copy(value, label)}>
-        {copy.state === "idle" ? "Copy" : copy.label}
-        <span className="sr-only"> {label}</span>
+      <button type="button" className="copy-button" data-copy-state={copy.state} aria-label={`${visible} ${label}`} onClick={() => void copy.copy(value, label)}>
+        {visible}
       </button>
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">{copy.message}</span>
     </>
