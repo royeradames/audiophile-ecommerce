@@ -38,16 +38,35 @@ test("the label goes back to idle after 2 s; counting starts again after 6 s", a
   assert.equal(feedback.snapshot().label, "Copied");
 });
 
-test("a rejected clipboard says so, never shows Copied, and the message stays", async (t) => {
+test("a rejected clipboard says so, never shows Copied, and a repeat failure is new too", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const { feedback, seen } = make(false);
   await feedback.copy("t", "the token");
   t.mock.timers.tick(100);
   assert.equal(feedback.snapshot().label, "Copy failed");
   assert.equal(feedback.snapshot().message, "Couldn't copy the token. Select the text and copy it by hand.");
+  await feedback.copy("t", "the token", "Open the page and copy it from there.");
+  t.mock.timers.tick(100);
+  assert.equal(feedback.snapshot().label, "Copy failed ×2");
+  assert.equal(feedback.snapshot().message, "Couldn't copy the token (2). Open the page and copy it from there.");
   assert.equal(seen.some((snapshot) => /Copied/.test(snapshot.label + snapshot.message)), false);
   t.mock.timers.tick(10000);
+  assert.equal(feedback.snapshot().state, "failed", "a failure stays until the next press");
   assert.match(feedback.snapshot().message, /Couldn't copy/);
+});
+
+test("reset goes back to idle, and nothing changes after dispose", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { feedback } = make();
+  await feedback.copy("t", "the token");
+  feedback.reset();
+  assert.deepEqual([feedback.snapshot().state, feedback.snapshot().count, feedback.snapshot().message], ["idle", 0, ""]);
+  feedback.dispose();
+  await feedback.copy("t", "the token");
+  assert.equal(feedback.snapshot().state, "idle");
+  feedback.activate();
+  await feedback.copy("t", "the token");
+  assert.equal(feedback.snapshot().label, "Copied");
 });
 
 test("writeToClipboard reports a rejection instead of throwing", async () => {

@@ -8,9 +8,9 @@ export type CopyState = "idle" | "copied" | "failed";
 
 export type CopySnapshot = {
   state: CopyState;
-  /** Presses in a row that succeeded; resets after `countMs` with no press. */
+  /** Presses in a row with the same result; resets after `countMs` with no press. */
   count: number;
-  /** Label while not idle: "Copied", "Copied ×2", "Copy failed". */
+  /** Label while not idle: "Copied", "Copied ×2", "Copy failed", "Copy failed ×2". */
   label: string;
   /** Text for a role="status" region that is always rendered. */
   message: string;
@@ -62,8 +62,10 @@ type Options = {
 
 export function createCopyFeedback({ onChange, labelMs = 2000, countMs = 6000, announceDelayMs = 100, write = writeToClipboard }: Options) {
   let snapshot: CopySnapshot = IDLE;
+  let disposed = false;
   const timers = { label: 0, count: 0, announce: 0 } as Record<"label" | "count" | "announce", ReturnType<typeof setTimeout> | 0>;
   const set = (next: Partial<CopySnapshot>) => {
+    if (disposed) return;
     snapshot = { ...snapshot, ...next };
     onChange(snapshot);
   };
@@ -78,31 +80,49 @@ export function createCopyFeedback({ onChange, labelMs = 2000, countMs = 6000, a
     timers.announce = setTimeout(() => set({ message: text }), announceDelayMs);
   };
 
-  /** `what` names the thing copied, for example "token" or "the link for Ana". */
-  async function copy(value: string, what: string): Promise<boolean> {
+  /**
+   * `what` names the thing copied, for example "the token". `hint` is the next step when the
+   * copy fails; by default "Select the text and copy it by hand."
+   */
+  async function copy(value: string, what: string, hint = "Select the text and copy it by hand."): Promise<boolean> {
     const ok = await write(value);
+    if (disposed) return ok;
     clear("label");
     clear("count");
+    const count = (ok ? snapshot.state !== "failed" : snapshot.state === "failed") ? snapshot.count + 1 : 1;
+    const again = count > 1 ? ` (${count})` : "";
     if (ok) {
-      const count = snapshot.count + 1;
       set({ state: "copied", count, label: count > 1 ? `Copied ×${count}` : "Copied" });
-      announce(count > 1 ? `Copied ${what} (${count}).` : `Copied ${what}.`);
+      announce(`Copied ${what}${again}.`);
+      timers.label = setTimeout(() => set({ state: "idle", label: "" }), labelMs);
       timers.count = setTimeout(() => set({ count: 0, message: "" }), countMs);
     } else {
-      set({ state: "failed", count: 0, label: "Copy failed" });
-      // Errors stay until the next press (catalog STS4).
-      announce(`Couldn't copy ${what}. Select the text and copy it by hand.`);
+      // A failure stays on the button and in the status until the next press (catalog STS4).
+      set({ state: "failed", count, label: count > 1 ? `Copy failed ×${count}` : "Copy failed" });
+      announce(`Couldn't copy ${what}${again}. ${hint}`);
     }
-    // The label goes back to idle; a failure message stays in the status region.
-    timers.label = setTimeout(() => set({ state: "idle", label: "" }), labelMs);
     return ok;
   }
 
   function dispose() {
+    disposed = true;
     clear("label");
     clear("count");
     clear("announce");
   }
 
-  return { copy, dispose, snapshot: () => snapshot };
+  /** Undoes dispose(), for a React StrictMode remount of the same component. */
+  function activate() {
+    disposed = false;
+  }
+
+  /** Back to idle, for example when the value being copied is replaced. */
+  function reset() {
+    clear("label");
+    clear("count");
+    clear("announce");
+    set(IDLE);
+  }
+
+  return { copy, dispose, activate, reset, snapshot: () => snapshot };
 }

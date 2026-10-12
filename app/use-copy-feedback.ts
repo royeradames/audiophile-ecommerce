@@ -8,6 +8,9 @@ import { createCopyFeedback, IDLE, type CopySnapshot } from "./copy-feedback";
 export function useCopyFeedback() {
   const [snapshot, setSnapshot] = useState<CopySnapshot>(IDLE);
   const [feedback] = useState(() => createCopyFeedback({ onChange: setSnapshot }));
-  useEffect(() => () => feedback.dispose(), [feedback]);
-  return { ...snapshot, copy: feedback.copy };
+  useEffect(() => {
+    feedback.activate();
+    return () => feedback.dispose();
+  }, [feedback]);
+  return { ...snapshot, copy: feedback.copy, reset: feedback.reset };
 }
