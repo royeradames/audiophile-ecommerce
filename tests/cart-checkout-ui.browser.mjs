@@ -87,6 +87,24 @@ try {
     assert.equal(await inside(), true, "focus stays in the cart after Remove all items");
   });
 
+  await section("Continue to checkout on the checkout page returns focus to the Cart button.", async (page) => {
+    await addHeadphones(page);
+    await page.goto(base + "/checkout");
+    const cart = page.getByRole("button", { name: /^Open cart, / });
+    const dialog = page.getByRole("dialog", { name: /^Cart/ });
+    for (let attempt = 0; attempt < 20 && !(await dialog.isVisible()); attempt += 1) {
+      await cart.click();
+      await page.waitForTimeout(300);
+    }
+    await dialog.waitFor();
+    await dialog.getByRole("link", { name: "Continue to checkout" }).focus();
+    await page.keyboard.press("Enter");
+    await dialog.waitFor({ state: "detached" });
+    await page.waitForTimeout(300);
+    assert.notEqual(await page.evaluate(() => document.activeElement === document.body), true, "focus does not drop to <body>");
+    assert.match((await activeName(page)) ?? "", /^Open cart/, "focus returns to the Cart button");
+  });
+
   await section("Checkout refuses a phone or ZIP of plain text and accepts real ones.", async (page) => {
     await addHeadphones(page);
     await page.goto(base + "/checkout");

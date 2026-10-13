@@ -269,9 +269,13 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                     // A new-tab or new-window click leaves this cart open.
                     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
                     // Leaving for checkout: don't pull focus back to a button
-                    // on the page that is about to go away.
-                    cartOpener.current = null;
-                    cartWasOpen.current = false;
+                    // on the page that is about to go away. Already on
+                    // /checkout, nothing replaces the page, so the normal
+                    // close returns focus to what opened the cart.
+                    if (pathname !== "/checkout") {
+                      cartOpener.current = null;
+                      cartWasOpen.current = false;
+                    }
                     closeCart();
                   }}
                 >
