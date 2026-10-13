@@ -37,7 +37,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isCartOpen) {
       // Remember what opened the cart (the Cart button or Add to cart).
-      cartOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      // Safari leaves focus on <body> after a click, so <body> means "the Cart button".
+      const active = document.activeElement;
+      cartOpener.current = active instanceof HTMLElement && active !== document.body ? active : null;
       closeButtonRef.current?.focus();
       return;
     }
@@ -45,10 +47,17 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     // opened it, unless a link inside the cart took the visitor elsewhere.
     const opener = cartOpener.current;
     cartOpener.current = null;
-    if (opener && (!document.activeElement || document.activeElement === document.body)) {
-      (opener.isConnected ? opener : cartButtonRef.current)?.focus();
+    if (!document.activeElement || document.activeElement === document.body) {
+      (opener?.isConnected ? opener : cartButtonRef.current)?.focus();
     }
   }, [isCartOpen]);
+
+  // Removing items can remove the focused button (Remove all, or − at 1).
+  // Keep focus in the open cart by moving it to Close.
+  useEffect(() => {
+    if (!isCartOpen) return;
+    if (!cartPanelRef.current?.contains(document.activeElement)) closeButtonRef.current?.focus();
+  }, [isCartOpen, items]);
 
   // The cart is a modal dialog: Tab and Shift+Tab cycle inside it.
   useEffect(() => {

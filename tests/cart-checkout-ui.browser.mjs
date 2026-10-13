@@ -62,6 +62,16 @@ try {
     await page.keyboard.press("Escape");
     await dialog.waitFor({ state: "detached" });
     assert.match((await activeName(page)) ?? "", /^Open cart/, "Escape returns focus to the Cart button");
+    // Removing the focused control keeps focus in the cart.
+    await page.keyboard.press("Enter");
+    await dialog.waitFor();
+    await page.getByRole("button", { name: /^Decrease .* quantity$/ }).first().focus();
+    await page.keyboard.press("Enter");
+    assert.equal(await inside(), true, "focus stays in the cart after − removes the last unit");
+    await addHeadphones(page);
+    await page.getByRole("button", { name: "Remove all items", exact: true }).focus();
+    await page.keyboard.press("Enter");
+    assert.equal(await inside(), true, "focus stays in the cart after Remove all items");
   });
 
   await section("Checkout refuses a phone or ZIP of plain text and accepts real ones.", async (page) => {
