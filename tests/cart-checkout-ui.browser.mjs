@@ -42,6 +42,13 @@ const activeName = (page) =>
   page.evaluate(() => document.activeElement?.getAttribute("aria-label") || document.activeElement?.textContent?.trim());
 
 try {
+  await section("Loading a page leaves focus where the browser puts it.", async (page) => {
+    await page.goto(base + "/headphones");
+    await page.getByRole("button", { name: /^Open cart, / }).waitFor();
+    await page.waitForTimeout(500);
+    assert.equal(await page.evaluate(() => document.activeElement === document.body), true, "nothing takes focus on load");
+  });
+
   await section("The cart dialog keeps Tab inside and returns focus on Escape.", async (page) => {
     const dialog = await addHeadphones(page);
     assert.equal(await activeName(page), "Close", "the cart opens on Close");

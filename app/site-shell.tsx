@@ -34,8 +34,10 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const cartButtonRef = useRef<HTMLButtonElement>(null);
   const cartPanelRef = useRef<HTMLElement>(null);
   const cartOpener = useRef<HTMLElement | null>(null);
+  const cartWasOpen = useRef(false);
   useEffect(() => {
     if (isCartOpen) {
+      cartWasOpen.current = true;
       // Remember what opened the cart (the Cart button or Add to cart).
       // Safari leaves focus on <body> after a click, so <body> means "the Cart button".
       const active = document.activeElement;
@@ -45,6 +47,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     }
     // Closing the cart (Escape, Close or the backdrop) returns focus to what
     // opened it, unless a link inside the cart took the visitor elsewhere.
+    // Only a real close restores focus; the first render leaves it alone.
+    if (!cartWasOpen.current) return;
+    cartWasOpen.current = false;
     const opener = cartOpener.current;
     cartOpener.current = null;
     if (!document.activeElement || document.activeElement === document.body) {
