@@ -31,8 +31,48 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     clearCart,
   } = useCart();
 
+  const cartButtonRef = useRef<HTMLButtonElement>(null);
+  const cartPanelRef = useRef<HTMLElement>(null);
+  const cartOpener = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    if (isCartOpen) closeButtonRef.current?.focus();
+    if (isCartOpen) {
+      // Remember what opened the cart (the Cart button or Add to cart).
+      cartOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      closeButtonRef.current?.focus();
+      return;
+    }
+    // Closing the cart (Escape, Close or the backdrop) returns focus to what
+    // opened it, unless a link inside the cart took the visitor elsewhere.
+    const opener = cartOpener.current;
+    cartOpener.current = null;
+    if (opener && (!document.activeElement || document.activeElement === document.body)) {
+      (opener.isConnected ? opener : cartButtonRef.current)?.focus();
+    }
+  }, [isCartOpen]);
+
+  // The cart is a modal dialog: Tab and Shift+Tab cycle inside it.
+  useEffect(() => {
+    if (!isCartOpen) return;
+    const keepFocusInCart = (event: KeyboardEvent) => {
+      if (event.key !== "Tab" || !cartPanelRef.current) return;
+      const stops = Array.from(
+        cartPanelRef.current.querySelectorAll<HTMLElement>("button:not([disabled]), a[href]"),
+      );
+      if (stops.length === 0) return;
+      const first = stops[0];
+      const last = stops[stops.length - 1];
+      const active = document.activeElement;
+      const inside = cartPanelRef.current.contains(active);
+      if (event.shiftKey && (active === first || !inside)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !inside)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", keepFocusInCart);
+    return () => document.removeEventListener("keydown", keepFocusInCart);
   }, [isCartOpen]);
 
   // Escape closes the phone menu and puts focus back on its button. While the
@@ -101,6 +141,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             {navigationLinks}
           </nav>
           <button
+            ref={cartButtonRef}
             className="cart-button"
             type="button"
             aria-haspopup="dialog"
@@ -156,6 +197,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       {isCartOpen ? (
         <div className="dialog-layer" onMouseDown={closeCart}>
           <section
+            ref={cartPanelRef}
             className="cart-panel"
             role="dialog"
             aria-modal="true"
