@@ -265,7 +265,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 <Link
                   className="button button-primary button-block"
                   href="/checkout"
-                  onClick={() => {
+                  onClick={(event) => {
+                    // A new-tab or new-window click leaves this cart open.
+                    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
                     // Leaving for checkout: don't pull focus back to a button
                     // on the page that is about to go away.
                     cartOpener.current = null;
