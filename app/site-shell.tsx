@@ -262,7 +262,17 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                   <span>Total</span>
                   <strong>{formatPrice(total)}</strong>
                 </div>
-                <Link className="button button-primary button-block" href="/checkout" onClick={closeCart}>
+                <Link
+                  className="button button-primary button-block"
+                  href="/checkout"
+                  onClick={() => {
+                    // Leaving for checkout: don't pull focus back to a button
+                    // on the page that is about to go away.
+                    cartOpener.current = null;
+                    cartWasOpen.current = false;
+                    closeCart();
+                  }}
+                >
                   Continue to checkout
                 </Link>
                 <button className="text-button remove-all" type="button" onClick={clearCart}>

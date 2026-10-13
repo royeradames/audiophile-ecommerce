@@ -72,8 +72,13 @@ try {
     // Removing the focused control keeps focus in the cart.
     await page.keyboard.press("Enter");
     await dialog.waitFor();
-    await page.getByRole("button", { name: /^Decrease .* quantity$/ }).first().focus();
-    await page.keyboard.press("Enter");
+    // Press − until the item is gone, so the focused button itself is removed.
+    const decrease = page.getByRole("button", { name: /^Decrease .* quantity$/ }).first();
+    await decrease.focus();
+    for (let press = 0; press < 20 && (await page.locator(".cart-list li").count()) > 0; press += 1) {
+      await page.keyboard.press("Enter");
+    }
+    assert.equal(await page.locator(".cart-list li").count(), 0, "the last unit was removed");
     assert.equal(await inside(), true, "focus stays in the cart after − removes the last unit");
     await addHeadphones(page);
     await page.getByRole("button", { name: "Remove all items", exact: true }).focus();
