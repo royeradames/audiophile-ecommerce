@@ -28,6 +28,7 @@ import { startHostedCheckout } from "../stripe-client";
 import { createServerOrder, fetchCustomer, fetchStoreFeatures } from "../store-client";
 import { sampleCheckoutDetails } from "../demo-store";
 import type { PaymentRequest } from "../payment-request";
+import { isPhoneNumber, isPostalCode } from "../contact-format";
 
 const fieldOrder = [
   "name",
@@ -69,9 +70,13 @@ const checkoutSchema = z
         ctx.addIssue({ code: "custom", message: "Enter a valid email address." });
       }
     }),
-    phone: requiredText("Phone number"),
+    phone: requiredText("Phone number").refine((value) => !value.trim() || isPhoneNumber(value), {
+      error: "Enter a valid phone number.",
+    }),
     address: requiredText("Address"),
-    zip: requiredText("ZIP code"),
+    zip: requiredText("ZIP code").refine((value) => !value.trim() || isPostalCode(value), {
+      error: "Enter a valid ZIP code.",
+    }),
     city: requiredText("City"),
     country: requiredText("Country"),
     payment: z.enum(paymentMethods),

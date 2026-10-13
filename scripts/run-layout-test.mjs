@@ -1,5 +1,6 @@
 // Starts the built Vercel target (npm run build:vercel) on a free local port,
-// runs tests/layout-identity.browser.mjs against it, then stops the server.
+// runs tests/layout-identity.browser.mjs and tests/cart-checkout-ui.browser.mjs
+// against it, then stops the server.
 // Part of npm test; needs Google Chrome (or PLAYWRIGHT_CHANNEL=chromium).
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
@@ -20,8 +21,11 @@ try {
     if (!ready) await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   if (!ready) throw new Error("The built app did not start; run npm run build:vercel first.");
-  const test = spawn(process.execPath, ["tests/layout-identity.browser.mjs"], { stdio: "inherit", env: { ...process.env, AUDIOPHILE_URL: url } });
-  process.exitCode = await new Promise((resolve) => test.on("exit", (code) => resolve(code ?? 1)));
+  for (const file of ["tests/layout-identity.browser.mjs", "tests/cart-checkout-ui.browser.mjs"]) {
+    const test = spawn(process.execPath, [file], { stdio: "inherit", env: { ...process.env, AUDIOPHILE_URL: url } });
+    const code = await new Promise((resolve) => test.on("exit", (exit) => resolve(exit ?? 1)));
+    if (code !== 0) process.exitCode = code;
+  }
 } finally {
   server.kill();
 }

@@ -31,8 +31,62 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     clearCart,
   } = useCart();
 
+  const cartButtonRef = useRef<HTMLButtonElement>(null);
+  const cartPanelRef = useRef<HTMLElement>(null);
+  const cartOpener = useRef<HTMLElement | null>(null);
+  const cartWasOpen = useRef(false);
   useEffect(() => {
-    if (isCartOpen) closeButtonRef.current?.focus();
+    if (isCartOpen) {
+      cartWasOpen.current = true;
+      // Remember what opened the cart (the Cart button or Add to cart).
+      // Safari leaves focus on <body> after a click, so <body> means "the Cart button".
+      const active = document.activeElement;
+      cartOpener.current = active instanceof HTMLElement && active !== document.body ? active : null;
+      closeButtonRef.current?.focus();
+      return;
+    }
+    // Closing the cart (Escape, Close or the backdrop) returns focus to what
+    // opened it, unless a link inside the cart took the visitor elsewhere.
+    // Only a real close restores focus; the first render leaves it alone.
+    if (!cartWasOpen.current) return;
+    cartWasOpen.current = false;
+    const opener = cartOpener.current;
+    cartOpener.current = null;
+    if (!document.activeElement || document.activeElement === document.body) {
+      (opener?.isConnected ? opener : cartButtonRef.current)?.focus();
+    }
+  }, [isCartOpen]);
+
+  // Removing items can remove the focused button (Remove all, or − at 1).
+  // Keep focus in the open cart by moving it to Close.
+  useEffect(() => {
+    if (!isCartOpen) return;
+    if (!cartPanelRef.current?.contains(document.activeElement)) closeButtonRef.current?.focus();
+  }, [isCartOpen, items]);
+
+  // The cart is a modal dialog: Tab and Shift+Tab cycle inside it.
+  useEffect(() => {
+    if (!isCartOpen) return;
+    const keepFocusInCart = (event: KeyboardEvent) => {
+      if (event.key !== "Tab" || !cartPanelRef.current) return;
+      const stops = Array.from(
+        cartPanelRef.current.querySelectorAll<HTMLElement>("button:not([disabled]), a[href]"),
+      );
+      if (stops.length === 0) return;
+      const first = stops[0];
+      const last = stops[stops.length - 1];
+      const active = document.activeElement;
+      const inside = cartPanelRef.current.contains(active);
+      if (event.shiftKey && (active === first || !inside)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !inside)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", keepFocusInCart);
+    return () => document.removeEventListener("keydown", keepFocusInCart);
   }, [isCartOpen]);
 
   // Escape closes the phone menu and puts focus back on its button. While the
@@ -101,6 +155,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             {navigationLinks}
           </nav>
           <button
+            ref={cartButtonRef}
             className="cart-button"
             type="button"
             aria-haspopup="dialog"
@@ -156,6 +211,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       {isCartOpen ? (
         <div className="dialog-layer" onMouseDown={closeCart}>
           <section
+            ref={cartPanelRef}
             className="cart-panel"
             role="dialog"
             aria-modal="true"
@@ -206,7 +262,23 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                   <span>Total</span>
                   <strong>{formatPrice(total)}</strong>
                 </div>
-                <Link className="button button-primary button-block" href="/checkout" onClick={closeCart}>
+                <Link
+                  className="button button-primary button-block"
+                  href="/checkout"
+                  onClick={(event) => {
+                    // A new-tab or new-window click leaves this cart open.
+                    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+                    // Leaving for checkout: don't pull focus back to a button
+                    // on the page that is about to go away. Already on
+                    // /checkout, nothing replaces the page, so the normal
+                    // close returns focus to what opened the cart.
+                    if (pathname !== "/checkout") {
+                      cartOpener.current = null;
+                      cartWasOpen.current = false;
+                    }
+                    closeCart();
+                  }}
+                >
                   Continue to checkout
                 </Link>
                 <button className="text-button remove-all" type="button" onClick={clearCart}>
