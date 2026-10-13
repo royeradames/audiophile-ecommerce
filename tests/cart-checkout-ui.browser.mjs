@@ -73,7 +73,8 @@ try {
     await page.keyboard.press("Enter");
     await dialog.waitFor();
     // Press − until the item is gone, so the focused button itself is removed.
-    const decrease = page.getByRole("button", { name: /^Decrease .* quantity$/ }).first();
+    // Scope to the cart: the product page's own − button comes first in the DOM.
+    const decrease = dialog.getByRole("button", { name: /^Decrease .* quantity$/ }).first();
     await decrease.focus();
     for (let press = 0; press < 20 && (await page.locator(".cart-list li").count()) > 0; press += 1) {
       await page.keyboard.press("Enter");
