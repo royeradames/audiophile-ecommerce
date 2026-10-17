@@ -1,7 +1,11 @@
 "use client";
 
 import * as z from "zod/mini";
+import en from "zod/v4/locales/en.js";
 import { orderSummarySchema, type NewOrder, type OrderSummary, type StoreFeatures } from "./order-api";
+
+// Zod Mini loads no messages by default; English keeps built-in messages identical to classic Zod.
+z.config(en());
 
 const featuresSchema = z.object({
   demo: z.boolean(),

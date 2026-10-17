@@ -1,6 +1,10 @@
 import * as z from "zod/mini";
+import en from "zod/v4/locales/en.js";
 import { orderStatuses, type OrderLine } from "./order-record";
 import { paymentMethods } from "./payment-methods";
+
+// Zod Mini loads no messages by default; English keeps built-in messages identical to classic Zod.
+z.config(en());
 
 /** What this deployment offers. The guest-only Sites fallback has neither. */
 export type StoreFeatures = {

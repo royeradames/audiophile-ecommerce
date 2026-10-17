@@ -6,6 +6,7 @@ import { AnyFieldApi, useForm } from "@tanstack/react-form";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as z from "zod/mini";
+import en from "zod/v4/locales/en.js";
 import { formatPrice, getProduct } from "../catalog";
 import { checkoutTotals, DEMO_USD_TO_DOP, formatDopFromUsd, formatUsd } from "../checkout-totals";
 import { useCart } from "../cart-context";
@@ -28,6 +29,9 @@ import { startHostedCheckout } from "../stripe-client";
 import { createServerOrder, fetchCustomer, fetchStoreFeatures } from "../store-client";
 import { sampleCheckoutDetails } from "../demo-store";
 import type { PaymentRequest } from "../payment-request";
+
+// Zod Mini loads no messages by default; English keeps built-in messages identical to classic Zod.
+z.config(en());
 
 const fieldOrder = [
   "name",
