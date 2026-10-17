@@ -2171,3 +2171,12 @@ legend {
     padding-inline: 16px;
   }
 }
+
+/* While an order loads, the short "Loading the order…" body would pull the footer up, and
+   the order would then push it down again (a layout shift). Keep it hidden until the order
+   is in place; without JavaScript the footer stays visible. */
+@media (scripting: enabled) {
+  body:has(.order-loading) > .site-footer {
+    visibility: hidden;
+  }
+}

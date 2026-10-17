@@ -14,7 +14,7 @@ import { fetchServerOrder, fetchStoreFeatures } from "../../store-client";
 
 export default function CheckoutPayPage() {
   return (
-    <Suspense fallback={<PayBody message="Loading the order…" />}>
+    <Suspense fallback={<PayBody message="Loading the order…" loading />}>
       <CheckoutPayClient />
     </Suspense>
   );
@@ -76,7 +76,7 @@ function CheckoutPayClient() {
   );
 
   if (!orderId) return <PayBody message="Open an order from its confirmation link or your account." />;
-  if (server.state === "loading") return <PayBody message="Loading the order…" />;
+  if (server.state === "loading") return <PayBody message="Loading the order…" loading />;
   if (server.state === "error") return <PayBody message={server.error} />;
 
   const order: OrderSummary | null = server.state === "found"
@@ -163,9 +163,9 @@ function CheckoutPayClient() {
   );
 }
 
-function PayBody({ message }: { message: string }) {
+function PayBody({ message, loading = false }: { message: string; loading?: boolean }) {
   return (
-    <section className="stack-page section" aria-labelledby="pay-title">
+    <section className={loading ? "stack-page section order-loading" : "stack-page section"} aria-labelledby="pay-title">
       <div className="container">
         <h1 id="pay-title">Order</h1>
         <p role="status">{message}</p>
