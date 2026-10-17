@@ -25,8 +25,8 @@ export function ZelleQr({
       className={`zelle-qr${compact ? " is-compact" : ""}`}
       src={ZELLE_QR_IMAGE}
       alt={label}
-      width={1290}
-      height={1722}
+      width={645}
+      height={861}
     />
   );
 }
