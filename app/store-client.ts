@@ -1,6 +1,6 @@
 "use client";
 
-import { z } from "zod";
+import * as z from "zod/mini";
 import { orderSummarySchema, type NewOrder, type OrderSummary, type StoreFeatures } from "./order-api";
 
 const featuresSchema = z.object({
@@ -28,7 +28,7 @@ export function fetchStoreFeatures() {
   return features;
 }
 
-const errorSchema = z.object({ error: z.string().min(1) });
+const errorSchema = z.object({ error: z.string().check(z.minLength(1)) });
 
 async function errorFrom(response: Response, fallback: string) {
   return errorSchema.safeParse(await response.json().catch(() => null)).data?.error ?? fallback;
@@ -89,7 +89,7 @@ export async function fetchAccountOrders(): Promise<AccountOrders> {
   }
 }
 
-const principalSchema = z.object({ id: z.string(), name: z.string(), email: z.string() }).nullable();
+const principalSchema = z.nullable(z.object({ id: z.string(), name: z.string(), email: z.string() }));
 
 /** The customer signed in on this browser, or null. Throws when it cannot be checked. */
 export async function fetchCustomer() {

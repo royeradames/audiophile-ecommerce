@@ -5,7 +5,7 @@
 import { AnyFieldApi, useForm } from "@tanstack/react-form";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { z } from "zod";
+import * as z from "zod/mini";
 import { formatPrice, getProduct } from "../catalog";
 import { checkoutTotals, DEMO_USD_TO_DOP, formatDopFromUsd, formatUsd } from "../checkout-totals";
 import { useCart } from "../cart-context";
@@ -52,15 +52,15 @@ const fields = [
 ] as const;
 
 function requiredText(label: string) {
-  return z.string().refine((value) => value.trim().length > 0, {
+  return z.string().check(z.refine((value) => value.trim().length > 0, {
     error: `${label} is required.`,
-  });
+  }));
 }
 
 const checkoutSchema = z
   .object({
     name: requiredText("Name"),
-    email: z.string().superRefine((value, ctx) => {
+    email: z.string().check(z.superRefine((value, ctx) => {
       if (!value.trim()) {
         ctx.addIssue({ code: "custom", message: "Email address is required." });
         return;
@@ -68,7 +68,7 @@ const checkoutSchema = z
       if (!/^\S+@\S+\.\S+$/.test(value)) {
         ctx.addIssue({ code: "custom", message: "Enter a valid email address." });
       }
-    }),
+    })),
     phone: requiredText("Phone number"),
     address: requiredText("Address"),
     zip: requiredText("ZIP code"),
@@ -77,7 +77,7 @@ const checkoutSchema = z
     payment: z.enum(paymentMethods),
     pickupCity: z.enum(["santo_domingo", "santiago", ""]),
   })
-  .superRefine((value, ctx) => {
+  .check(z.superRefine((value, ctx) => {
     if (value.payment !== "in_person") {
       return;
     }
@@ -88,7 +88,7 @@ const checkoutSchema = z
         message: "Choose Santo Domingo or Santiago.",
       });
     }
-  });
+  }));
 
 type CheckoutValues = z.input<typeof checkoutSchema>;
 
