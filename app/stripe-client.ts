@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 import type { PaymentRequest } from "./payment-request";
 import type { StripePublicConfig } from "./stripe-env";
 
@@ -18,9 +18,9 @@ function paymentBody(input: PaymentRequest) {
   });
 }
 
-const paymentErrorSchema = z.object({ error: z.string().min(1) });
+const paymentErrorSchema = z.object({ error: z.string().check(z.minLength(1)) });
 const checkoutResponseSchema = z.object({ url: z.url() });
-const intentResponseSchema = z.object({ clientSecret: z.string().min(1), amount: z.number().positive().finite() });
+const intentResponseSchema = z.object({ clientSecret: z.string().check(z.minLength(1)), amount: z.number().check(z.positive()) });
 
 export async function startHostedCheckout(input: PaymentRequest) {
   const fallback = "Could not start Stripe test Checkout. Please try again.";
