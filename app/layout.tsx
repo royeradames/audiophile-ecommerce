@@ -7,7 +7,10 @@ import { PayeeProvider } from "./payee-context";
 import { SHARE_IMAGE, SITE_NAME, SITE_URL } from "./site-identity";
 import { SiteShell } from "./site-shell";
 
+// Fonts aren't preloaded: text paints at once in next/font's size-matched fallback (display: swap), so the
+// font files needn't compete with the first paint.
 const manrope = Manrope({
+  preload: false,
   variable: "--font-manrope",
   subsets: ["latin"],
 });
