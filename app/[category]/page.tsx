@@ -37,7 +37,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           {categoryProducts.map((product, index) => (
             <article className={`product-row ${index % 2 ? "product-row-reverse" : ""}`} key={product.id}>
               <div className="product-image-wrap">
-                <ResponsiveImage source={product.categoryImage} alt={`${product.name} product view`} />
+                <ResponsiveImage source={product.categoryImage} alt={`${product.name} product view`} loading={index === 0 ? "eager" : "lazy"} />
               </div>
               <div className="product-summary">
                 {product.isNew ? <p className="overline overline-accent">New product</p> : null}
