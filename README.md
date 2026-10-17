@@ -1,69 +1,121 @@
-# Audiophile
+# Frontend Mentor - Audiophile e-commerce website solution
 
-Responsive portfolio storefront experiment adapted from Frontend Mentor's Audiophile e-commerce challenge.
+This is a solution to the [Audiophile e-commerce website challenge on Frontend Mentor](https://www.frontendmentor.io/challenges/audiophile-ecommerce-website-C8cuSd_wx). I built a responsive demo store for browsing audio products, managing a cart and completing a test checkout.
 
-## Product boundary
+## Table of contents
 
-**Demo store (Royer, October 8, 2026).** Nothing is sold, charged for real or shipped. Every page says so, Stripe runs in test mode only and live (or restricted live) keys are refused, checkout offers **Fill sample details**, and card payment shows Stripe's test card. The store never receives name, email, phone or address: checkout validates them in the browser and keeps them there. The server keeps orders, items, totals and payment status only. Orders never paid are deleted after 7 days by a daily Vercel Cron (`/api/cron/purge-orders`, which first cancels their open card attempts at Stripe and keeps any order whose payment could hold money). Order creation and payment starts are rate limited per client address (IPv6 per /64) and per anonymous browser session, stored as HMAC buckets for up to two days.
+- [Overview](#overview)
+  - [The challenge](#the-challenge)
+  - [Screenshot](#screenshot)
+  - [Links](#links)
+- [My process](#my-process)
+  - [Built with](#built-with)
+  - [What I learned](#what-i-learned)
+  - [Continued development](#continued-development)
+- [Run it locally](#run-it-locally)
+- [Author](#author)
 
-Production settings: `CRON_SECRET` (Vercel sends it to the cron; without it the purge refuses to run) and `RATE_LIMIT_SECRET` (keys the rate-limit hashes). Cron runs only on Production, so the Preview/Development database is not purged. Dropped columns stay in Neon's point-in-time history until its retention window passes.
+## Overview
 
-- Six fictional audio products across headphones, speakers, and earphones.
-- The cart and payee mocks persist in the current browser. On Vercel, orders are created on the server from catalog prices before any payment and stored in PostgreSQL (Neon); the owner-only Sites fallback stays guest-only and keeps orders in the browser.
-- Customer accounts use the central Breakthrough account (`@royer/auth` 0.1.0-rc.5, central mode). They are on only where the issuer registered the deployment, today the protected Preview; production says "accounts coming soon". Guest checkout always works.
-- Stripe Checkout and Payment Element run in **test mode only**. Live Stripe keys are refused.
-- Confirmation is not paid until Stripe test reports payment or a transfer is marked paid by hand.
-- Do not collect raw card numbers. Do not send money to mock Banreservas or Popular accounts.
+### The challenge
 
-## Local work
+Users should be able to:
 
-Requires Node.js 22.13 or newer.
+- Browse headphones, speakers and earphones, and open each product's details.
+- Use the layout and navigation on mobile, tablet and desktop screens.
+- Add products to the cart, change quantities, remove items or clear the cart.
+- Keep the cart after refreshing the page in the same browser.
+- Complete the checkout form and see errors for missing or invalid details.
+- Review product totals, $50 shipping and the brief's included 20% VAT.
+- See an order confirmation with a summary of their purchase.
+
+### Screenshot
+
+![Audiophile at 1440 px](./docs/screenshot.jpg)
+
+### Links
+
+- Solution URL: [My Frontend Mentor solution](https://www.frontendmentor.io/solutions/audiophile-e-commerce-with-nextjs-typescript-and-tailwind-5ISbaNXNvM)
+- Live Site URL: [Audiophile demo store](https://audiophile.royeradames.com)
+
+## My process
+
+### Built with
+
+- Next.js App Router and React
+- TypeScript
+- Custom CSS, Grid and Flexbox
+- TanStack Form and Zod for checkout validation
+- PostgreSQL on Neon for stored orders
+- Stripe Checkout and Payment Element in test mode
+- vinext and Vite for the Sites build
+- Node.js test runner, PGlite and Playwright
+
+### What I learned
+
+I calculate stored order and payment totals on the server from validated catalog items. The browser displays a total, but it cannot set the amount charged. Zod checks product IDs and quantities, and `priceCart` looks up each price in the catalog. Unknown products and duplicate items are rejected.
+
+The brief's 20% VAT conflicted with the Dominican Republic's 18% ITBIS. I chose the brief, and PR 12 switched the calculation. VAT is shown as included in product prices, so the grand total adds only shipping. Older orders keep their stored totals. I learned to record the owner's choice and default when two rules disagree.
+
+I save the server order before starting payment. A request key makes a repeated submission return the same order, and payment confirmation checks the stored amount. Placing an order and paying for it are separate steps. The demo checkout validates name, email, phone and address in the browser without sending those details to the store server.
+
+### Continued development
+
+- I need to update the older browser-only order and production-checkout notes in `docs/payment-testing.md` to match the current server-backed demo.
+
+## Run it locally
+
+I use Node.js 22.13 or newer.
 
 ```bash
 npm install
 cp .env.example .env.local
 cp .dev.vars.example .dev.vars
 npm run dev
+```
+
+The local payment guide uses `http://localhost:3000`. For card testing, I put the same Stripe `sk_test_` and `pk_test_` values in both copied files. The examples also list the webhook secret and optional `STAFF_PASSWORD`. Keep both local files out of Git. `/orders` is open on localhost without a password; set `STAFF_PASSWORD` before exposing that queue publicly.
+
+```bash
 npm test
 npm run lint
 npm run build:vercel
 ```
 
-Stripe test keys, webhook secret, and optional `STAFF_PASSWORD` are listed in `.env.example` and `.dev.vars.example`. Copy both, then paste the same `sk_test_` / `pk_test_` values into `.env.local` and `.dev.vars`. Never commit those two files. `/orders` is open on localhost without a password. Set `STAFF_PASSWORD` before exposing that queue on a public host.
+`npm test` runs unit and in-memory PostgreSQL checks, both build targets, HTML checks and a browser layout check across 15 routes and 22 widths. It needs Google Chrome. Native Next.js builds target Vercel; vinext builds target the private Sites fallback.
 
-Payment click-through (every method, test cards, what not to send): [docs/payment-testing.md](docs/payment-testing.md).
+Optional checks from the existing setup:
 
-To check cancelled-checkout recovery, start a native production build on `http://127.0.0.1:4346`, install Google Chrome and make Playwright available, then run `node tests/checkout-cancel.browser.mjs`. `PLAYWRIGHT_MODULE` can point to an existing Playwright `index.mjs`; `AUDIOPHILE_URL` selects another localhost server. The test uses a fresh browser, fictional details and a local substitute for Stripe's redirect. It checks pending-order retry after cart clearing without contacting Stripe or changing payment settings. Results and screenshots go to ignored `outputs/`.
+```bash
+npm run test:journey
+npm run test:hosted
+node tests/checkout-cancel.browser.mjs
+```
 
-Webhook URL: `/api/stripe/webhook`. Use the Stripe CLI: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
+Run `test:journey` after `build:vercel`; it starts local HTTPS services and needs Stripe test keys. `test:hosted` needs the protected Preview URL, bypass token and test secrets. The cancellation check needs a native production server at `http://127.0.0.1:4346`, Chrome and Playwright. `AUDIOPHILE_URL` selects another localhost server, and `PLAYWRIGHT_MODULE` can point to an existing Playwright `index.mjs`. Results go to ignored `outputs/`.
 
-AZUL affiliation, live bank numbers, and a live merchant account are human steps. They are tracked on `/payments`, not completed by this repo.
+For local webhooks:
 
-The project uses Next.js App Router source with two build targets: native Next.js for Vercel and vinext for Sites. Production is published at <https://audiophile.royeradames.com>; the owner-only Sites build remains available as a private fallback. Product imagery and seed copy are challenge assets; see `THIRD_PARTY_ASSETS_LICENSE.md`.
+```bash
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+```
 
-## Durable orders
-
-`POST /api/orders` saves the order (server totals, with the brief's 20% demo VAT included in the prices) before payment. A request key makes a retried submission return the same order. Payment status is stored per Stripe PaymentIntent in `audiophile_payments`; the webhook (`/api/stripe/webhook`, each event handled once) and the return/confirmation routes settle the order idempotently, and only for the stored amount. A card retry reuses the open PaymentIntent. `GET /api/orders/<id>` returns the order status without address or email, so a confirmation link works in any browser.
-
-Migrations live in `migrations/`, are idempotent, and are recorded with their SHA-256. Review the plan, then apply it to one named Neon database:
+Database migrations are in `migrations/`. Review the plan before applying it to one named Neon database:
 
 ```bash
 npm run db:plan
 vercel env run -e preview -- node scripts/migrate.mjs --neon-project=<NEON_PROJECT_ID> --reviewed-sha256=<combined hash>
 ```
 
-Expand/contract releases: apply up to the expand file with `--through=0004_demo_store_expand.sql` before merging, let Production deploy, then apply the rest (0005 drops the personal-detail columns). From the expand step on, roll forward rather than back: pre-demo code cannot read orders the new code created.
+Run that migration command from a checkout without `.env.local`, which can override the selected Vercel environment. Preview and Development share a Neon project; Production uses its own. The demo-store expand/contract migration requires applying through `0004_demo_store_expand.sql` before deploying, then applying the remaining files. Roll forward after the expand step.
 
-Run it from a checkout without `.env.local`: `vercel env run` lets that file override the chosen environment, so a Production run would otherwise reach the Development database. Preview and Development share one Neon project; Production has its own.
+This is a demo. Nothing is sold, charged for real or shipped. I use fictional checkout details and Stripe test cards; live Stripe keys are refused. Do not send money to the mock bank or Zelle details. Confirmation stays unpaid until Stripe reports a test payment or a transfer is marked paid by hand. AZUL affiliation and live merchant setup remain unfinished human steps listed on `/payments`. The [payment-testing guide](./docs/payment-testing.md) has the click-through instructions, though some older notes need the update listed above.
 
-`migrations/0002_accounts.sql` was generated by `node scripts/plan-accounts-migration.mjs` from rc.4. A package upgrade adds a new file instead: `node scripts/plan-auth-upgrade-migration.mjs <NNNN_name.sql> <version>` applies the existing migrations to an in-memory database and writes only what the new adapter still needs, and `tests/accounts-schema.test.ts` fails until it exists. rc.5 needs `0006_auth_rc5_callbacks.sql` (`federationTransaction.completedSessionId` and `claims`); without it every federated sign-in fails. It is applied to the Preview/Development database; apply it to Production before accounts are turned on there.
+The cart and payee mocks persist in the current browser. Vercel stores orders, items, totals and payment status in Neon; the Sites fallback keeps orders in the browser. Unpaid orders are purged after seven days when open card attempts can be safely cancelled. Production needs `CRON_SECRET` and `RATE_LIMIT_SECRET`; Preview and Development are not purged. Dropped columns remain in Neon's point-in-time history until its retention window passes.
 
-## Customer accounts
+I keep text at least 16 px, which changes some spacing from the supplied design. The six fictional products, imagery and seed copy come from the challenge assets. See [the third-party asset licence](./THIRD_PARTY_ASSETS_LICENSE.md).
 
-Sign-in happens on the Breakthrough accounts site; Audiophile keeps only its own principal IDs, a host-only session and its orders. `/account` shows the signed-in customer's history. The vendored archive `vendor/royer-auth-0.1.0-rc.5.tgz` (SHA-256 `7a4cc4eb5c67446aa6145d94002ed8b111aa90a9228eb2ba60577a7df53ff730`) is the CI-built rc.5 release; this repository is private, so it keeps the archive instead of using the registry. Settings are listed in `.env.example`.
+## Author
 
-## Checks
-
-- `npm test`: unit and PostgreSQL (in-memory PGlite) regressions, the Sites build and its HTML contracts, then the Vercel build and the layout and identity regression (`tests/layout-identity.browser.mjs`, about two minutes, needs Google Chrome): 15 routes at 22 widths, the phone menu, the cart dialog and each page's share card.
-- `npm run build:vercel`, then `npm run test:journey`: a real-browser journey on this machine. It runs the reviewed issuer and the built app over HTTPS on `*.localhost`, signs in two synthetic accounts, pays with Stripe's published test card (test keys from `.env.local`), and checks the order history across two browsers.
-- `npm run test:hosted`: the same order journey against the protected Preview (`AUDIOPHILE_PREVIEW_URL`, `AUDIOPHILE_PREVIEW_BYPASS`, `STRIPE_TEST_SECRET_KEY`); the account journey also needs the issuer's preview secrets. The **Hosted Audiophile journey** workflow runs it after each Preview deploy of the registered branch, then `scripts/cleanup-suite-data.mjs` removes the synthetic orders and local account records. Synthetic issuer accounts are the issuer's to remove.
+- Website - [Royer Adames](https://royeradames.com)
+- Frontend Mentor - [@royeradames](https://www.frontendmentor.io/profile/royeradames)
