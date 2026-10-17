@@ -1,6 +1,10 @@
 import * as z from "zod/mini";
+import en from "zod/v4/locales/en.js";
 import type { PaymentRequest } from "./payment-request";
 import type { StripePublicConfig } from "./stripe-env";
+
+// Zod Mini loads no messages by default; English keeps built-in messages identical to classic Zod.
+z.config(en());
 
 export async function fetchStripeConfig(): Promise<StripePublicConfig> {
   const response = await fetch("/api/stripe/config");
