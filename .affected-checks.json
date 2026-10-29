@@ -1,0 +1,155 @@
+{
+  "_about": "royer-merge change-scoped checks for audiophile-ecommerce (affected-checks.mjs reads this before the toolbox file). Added Oct 28, 2026 in the bottleneck rollout.",
+  "profiles": {
+    "audiophile-ecommerce": {
+      "remote": "audiophile-ecommerce",
+      "docs": [
+        "**/*.md",
+        "docs/**",
+        "**/*.txt",
+        "**/LICENSE",
+        "examples/**",
+        ".openai/**",
+        "THIRD_PARTY_ASSETS_LICENSE.md"
+      ],
+      "instructions": [
+        "AGENTS.md",
+        "**/AGENTS.md",
+        "CLAUDE.md",
+        ".cursor/rules/**"
+      ],
+      "global": [
+        ".affected-checks.json",
+        "package.json",
+        "package-lock.json",
+        "bun.lock",
+        ".npmrc",
+        "tsconfig.json",
+        "next.config.ts",
+        "vite.config.ts",
+        "build/**",
+        "eslint.config.mjs",
+        "postcss.config.mjs",
+        "drizzle.config.ts",
+        "vercel.json",
+        ".github/**",
+        "setup.json",
+        "app/layout.tsx",
+        "app/globals.css",
+        "middleware.ts",
+        "proxy.ts",
+        "tests/support/**",
+        "tests/typescript-loader.mjs"
+      ],
+      "checks": [
+        {
+          "name": "lint",
+          "what": "eslint . (the lint script)",
+          "lane": "light",
+          "independent": true,
+          "boat": true,
+          "cmd": "./node_modules/.bin/eslint . --ignore-pattern dist --ignore-pattern .next",
+          "when": [
+            "**/*.ts",
+            "**/*.tsx",
+            "**/*.mts",
+            "**/*.js",
+            "**/*.mjs"
+          ]
+        },
+        {
+          "name": "unit",
+          "what": "node unit and PGlite regression tests (tests/*.test.ts)",
+          "lane": "light",
+          "independent": true,
+          "boat": true,
+          "cmd": "node --experimental-strip-types --test tests/*.test.ts",
+          "when": [
+            "**/*.ts",
+            "**/*.tsx",
+            "**/*.mts",
+            "**/*.mjs",
+            "**/*.js",
+            "app/**/*.json",
+            "migrations/**",
+            "drizzle/**",
+            "vendor/**"
+          ]
+        },
+        {
+          "name": "build-vercel",
+          "what": "next build (what Vercel runs, build:vercel)",
+          "lane": "heavy",
+          "independent": true,
+          "boat": true,
+          "anyCode": true,
+          "cmd": "./node_modules/.bin/next build"
+        },
+        {
+          "name": "ui-quality-gate",
+          "aliases": [
+            "quality-gate"
+          ],
+          "what": "the UI quality gate on the pages the diff reaches, at promotion QA; merges skip it (main ships at merge, no promotion gate)",
+          "routes": true,
+          "at": "promotion",
+          "when": [
+            "app/**",
+            "public/**"
+          ]
+        },
+        {
+          "name": "qa",
+          "what": "independent royer-qa on the PR's own routes",
+          "at": "promotion",
+          "routes": true,
+          "when": [
+            "app/**",
+            "public/**"
+          ],
+          "instructionsToo": true
+        },
+        {
+          "name": "qa-gate",
+          "what": "QA at the head before merge (the carve-out: auth, payments, data, secrets and deploy config)",
+          "gate": [
+            "app/api/**",
+            "app/*auth*",
+            "app/chatgpt-auth.ts",
+            "app/staff-session.ts",
+            "app/stripe-*",
+            "app/payment*",
+            "app/paid-ledger.ts",
+            "app/card-payment.tsx",
+            "app/checkout/**",
+            "app/payments/**",
+            "app/zelle/**",
+            "app/server/**",
+            "db/**",
+            "migrations/**",
+            "drizzle/**",
+            "drizzle.config.ts",
+            "scripts/*migrat*",
+            "vendor/**",
+            "worker/**",
+            "vercel.json",
+            ".env*",
+            "**/.env*",
+            ".dev.vars*",
+            "setup.json",
+            ".github/workflows/**"
+          ],
+          "carryAs": "qa"
+        }
+      ],
+      "setup": "[ -d node_modules ] || if [ -f bun.lock ]; then b=\"${BUN:-$HOME/.bun/bin/bun}\"; [ -x \"$b\" ] || b=$(command -v bun) || { echo 'setup: bun.lock but no bun (set BUN or install ~/.bun/bin/bun)' >&2; exit 1; }; NPM_CONFIG_USERCONFIG=/dev/null \"$b\" install --frozen-lockfile > /dev/null; else npm install --no-audit --no-fund > /dev/null 2>&1; fi",
+      "_setup": "Same string as answerbar. This repo stays on npm (package-lock.json): GitHub CI's `npm ci` needs it, and moving CI to Bun changes .github/workflows, a qa-gate path. So setup takes the npm install branch.",
+      "setupWhenMissing": "node_modules",
+      "boat": {
+        "setup": "v=$(node -p \"((require('./package.json').packageManager || '').match(/^bun@(.+)$/) || [])[1] || ''\"); [ -z \"$v\" ] || npm i -g \"bun@$v\" > /dev/null 2>&1; hash -r",
+        "_setup": "No packageManager, so this installs nothing extra; setup runs npm install."
+      },
+      "_ci": "GitHub CI (.github/workflows/ci.yml on Mac2's self-hosted runner) runs the full npm test on every PR: setup coverage, the Sites (vinext) build and its HTML contracts, and the layout regression in Google Chrome. Those need Chrome and wrangler, so they aren't profile checks; a merge reads that CI result at the head."
+    }
+  }
+}
