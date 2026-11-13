@@ -1,0 +1,35 @@
+---
+description: Stripe skill routing for this shop. Load stripe-best-practices and stripe-docs; skip Connect/Apps. Test keys only; AZUL is the live DR rail.
+alwaysApply: true
+---
+
+# Stripe skills in this project
+
+Stripe’s agent skills are in this project. I ran `npx skills add https://docs.stripe.com` and installed all 8 skills.
+
+They live in `.agents/skills/` (official install) and are linked into `.cursor/skills/` so Cursor can see them. A new chat may be needed before they show up in the skill list.
+
+The ones that matter for this shop:
+
+- `stripe-best-practices` — Checkout vs Payment Element, keys, webhooks
+- `stripe-docs` — look up docs with `stripe docs` instead of scraping the site
+
+The rest came with the catalog: Connect, Stripe Apps, Stripe Projects, Directory, `upgrade-stripe`. We are not a Connect platform, so those stay unused.
+
+They do not auto-update. Later: `npx skills update -y`. Nothing is committed unless you ask.
+
+## Before Stripe code or docs
+
+1. Read `.agents/skills/stripe-best-practices/SKILL.md` and `references/payments.md` plus `references/security.md`.
+2. Look up docs with `stripe docs` (see `.agents/skills/stripe-docs/SKILL.md`). Do not scrape docs.stripe.com.
+3. Do not load Connect, Stripe Apps, Stripe Projects, Directory, or `upgrade-stripe` unless asked.
+
+## This shop (overrides the catalog)
+
+- Stripe is **test only**. `app/stripe-env.ts` refuses `sk_live_` / `pk_live_`. Do not paste live keys. Do not turn this into a live Stripe merchant.
+- Live DR cards are **AZUL persona física**, not Stripe live. Do not land Stripe live + AZUL in one diff.
+- Keep using `app/stripe-api.ts` fetch helpers. Do not add the Stripe Node SDK unless asked.
+- Demo ITBIS is app-side. Do not enable Stripe Tax.
+- Do not commit `.dev.vars` or `.env.local`.
+
+Shop overlay skill: `.cursor/skills/audiophile-stripe/SKILL.md`. That folder is not in `skills-lock.json`. After `npx skills update -y`, restore it if `.cursor/skills/` was rebuilt.
