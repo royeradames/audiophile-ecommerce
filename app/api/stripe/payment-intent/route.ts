@@ -2,8 +2,9 @@ import { createStripePaymentIntent, retrieveStripePaymentIntent } from "../../..
 import { recordPaidOrder } from "../../../paid-ledger";
 import { stripePublicConfig } from "../../../stripe-env";
 import { readPaymentRequest } from "../../../payment-request";
-import { paymentFromIntent } from "../../../stripe-webhook";
+import { intentStatus, paymentFromIntent } from "../../../stripe-webhook";
 import { cardIntentFor, payableOrder, recordPayment, settledPaid } from "../../../server/payments";
+import { clientAddress, limits, overLimit, tooManyRequests } from "../../../server/rate-limit";
 import { serverRuntime } from "../../../server/runtime";
 
 export async function GET(request: Request) {
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
     if (intent.livemode === true) {
       return Response.json({ error: "Live Stripe objects are blocked." }, { status: 400 });
     }
-    const status = typeof intent.status === "string" ? intent.status : "";
+    const status = intentStatus(intent.status) ?? "";
     const metadata = intent.metadata && typeof intent.metadata === "object" ? intent.metadata : null;
     const orderId =
       metadata && "order_id" in metadata && typeof metadata.order_id === "string"
@@ -67,6 +68,18 @@ export async function POST(request: Request) {
     );
   }
 
+  const runtimeForLimit = serverRuntime();
+  if (runtimeForLimit) {
+    try {
+      const wait = await overLimit(runtimeForLimit.db, [
+        { scope: "payments:address", id: clientAddress(request), limit: limits.paymentStartsPerAddress },
+      ]);
+      if (wait !== null) return tooManyRequests(wait, "Too many payment attempts from this connection.");
+    } catch {
+      return Response.json({ error: "Payment could not start. Nothing was charged; please try again." }, { status: 503 });
+    }
+  }
+
   const payment = await readPaymentRequest(request);
   if (!payment.ok) {
     return Response.json({ error: payment.error }, { status: payment.status });
@@ -75,10 +88,11 @@ export async function POST(request: Request) {
   const runtime = serverRuntime();
   if (runtime) {
     try {
-      const payable = await payableOrder(runtime.db, payment);
+      const payable = await payableOrder(runtime.db, payment, "element");
       if (!payable.ok) return Response.json({ error: payable.error }, { status: payable.status });
-      const clientSecret = await cardIntentFor(runtime.db, payable.order);
-      return Response.json({ clientSecret, amount: payable.order.grandTotal });
+      const intent = await cardIntentFor(runtime.db, payable.order);
+      if (!intent.ok) return Response.json({ error: intent.error }, { status: intent.status });
+      return Response.json({ clientSecret: intent.clientSecret, amount: payable.order.grandTotal });
     } catch {
       return Response.json({ error: "Could not start the Stripe test card form. Please try again." }, { status: 502 });
     }
@@ -88,7 +102,6 @@ export async function POST(request: Request) {
     const intent = await createStripePaymentIntent({
       orderId: payment.orderId,
       amountCents: payment.amountCents,
-      email: payment.email,
     });
     const clientSecret = typeof intent.client_secret === "string" ? intent.client_secret : null;
     if (!clientSecret) {

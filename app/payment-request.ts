@@ -11,7 +11,8 @@ export const cartItemsSchema = z.array(z.strictObject({
 
 const paymentRequestSchema = z.strictObject({
   orderId: z.string().trim().regex(/^AUD-[A-Z0-9-]{1,64}$/),
-  email: z.email().max(254),
+  // Optional: it only prefills Stripe's fields. The store never keeps it.
+  email: z.email().max(254).optional(),
   items: cartItemsSchema,
 });
 
@@ -97,7 +98,7 @@ export async function readPaymentRequest(request: Request) {
 
   const parsed = paymentRequestSchema.safeParse(body.payload);
   if (!parsed.success) {
-    return invalidRequest("Send an order ID, email, and product quantities from 1 to 99. Prices and totals are calculated by the store.");
+    return invalidRequest("Send an order ID and product quantities from 1 to 99. Prices and totals are calculated by the store.");
   }
   const { orderId, email, items } = parsed.data;
   const priced = priceCart(items);

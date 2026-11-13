@@ -7,9 +7,11 @@ import { useEffect, useMemo, useState } from "react";
 import { createPaymentIntent, fetchStripeConfig, fetchStripePaymentIntent } from "./stripe-client";
 import type { PaymentRequest } from "./payment-request";
 import { formatUsd } from "./checkout-totals";
+import { testCardHint } from "./demo-store";
 
 type CardPaymentProps = PaymentRequest & {
-  onPaid: () => void;
+  /** `recorded` is false when Stripe accepted the payment but the store has not confirmed it yet. */
+  onPaid: (recorded: boolean) => void;
 };
 
 export function CardPayment(props: CardPaymentProps) {
@@ -87,8 +89,8 @@ function CardPaymentForm({
   onPaid,
 }: {
   amount: number;
-  email: string;
-  onPaid: () => void;
+  email?: string;
+  onPaid: (recorded: boolean) => void;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -121,25 +123,26 @@ function CardPaymentForm({
         if (status === "succeeded") {
           // Tell the store now; the webhook may arrive later or, on a
           // protected preview, not at all. Recording is idempotent.
-          await fetchStripePaymentIntent(result.paymentIntent.id).catch(() => null);
-          onPaid();
+          const confirmed = await fetchStripePaymentIntent(result.paymentIntent.id).catch(() => null);
+          onPaid(Boolean(confirmed?.ok && confirmed.paid));
           setSubmitting(false);
           return;
         }
-        setError("The payment is still pending. Check /orders after Stripe confirms it.");
+        setError("The payment is still pending. Reload this order's page after Stripe confirms it.");
         setSubmitting(false);
       }}
     >
+      <p className="test-card-hint">{testCardHint}</p>
       <PaymentElement
         options={{
           layout: "tabs",
-          defaultValues: { billingDetails: { email } },
+          ...(email ? { defaultValues: { billingDetails: { email } } } : {}),
           wallets: { applePay: "auto", googlePay: "auto" },
         }}
       />
-      {error ? <p className="stack-hint">{error}</p> : null}
-      <button className="button button-primary button-block" type="submit" disabled={!stripe} aria-busy={submitting}>
-        {submitting ? "Paying…" : `Pay ${formatUsd(amount)} (Stripe test)`}
+      {error ? <p className="stack-hint" role="alert">{error}</p> : null}
+      <button className="button button-primary button-block" type="submit" aria-busy={submitting || !stripe}>
+        {!stripe ? "Loading Stripe…" : submitting ? "Paying…" : `Pay ${formatUsd(amount)} (Stripe test)`}
       </button>
     </form>
   );

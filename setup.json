@@ -1,0 +1,180 @@
+{
+  "app": "audiophile",
+  "explain": "Audiophile is a demo store: Stripe test keys, a Neon database from the Vercel integration, a cron secret, a rate-limit key, and (on one Preview branch) the Breakthrough account connection.",
+  "vercelProject": "audiophile",
+  "scope": "royer-adames-projects",
+  "env": [
+    {
+      "key": "STRIPE_SECRET_KEY",
+      "target": [
+        "production",
+        "preview",
+        "development"
+      ],
+      "kind": "secret",
+      "owner": "human",
+      "why": "Stripe test-mode secret key (sk_test_). Without it, card payments and hosted Checkout answer 'Stripe test keys are missing'. Live keys are refused: this is a demo store.",
+      "whyHuman": "A credential minted inside Royer's own Stripe account.",
+      "get": {
+        "url": "https://dashboard.stripe.com/test/apikeys",
+        "steps": [
+          "In test mode, reveal the Secret key (sk_test_\u2026); never a live key, which the store refuses.",
+          "In your own Terminal: vercel env add STRIPE_SECRET_KEY production --sensitive (then preview), and paste it there, not in chat."
+        ]
+      }
+    },
+    {
+      "key": "STRIPE_PUBLISHABLE_KEY",
+      "target": [
+        "production",
+        "preview",
+        "development"
+      ],
+      "kind": "config",
+      "owner": "human",
+      "why": "Stripe test-mode publishable key (pk_test_) that loads the card form in the browser. It must pair with the secret key's account; without it the card form cannot load.",
+      "whyHuman": "It comes from Royer's own Stripe account, next to the secret key.",
+      "get": {
+        "url": "https://dashboard.stripe.com/test/apikeys",
+        "steps": [
+          "In test mode, copy the Publishable key (pk_test_\u2026).",
+          "In your own Terminal: vercel env add STRIPE_PUBLISHABLE_KEY production (then preview)."
+        ]
+      }
+    },
+    {
+      "key": "STRIPE_WEBHOOK_SECRET",
+      "target": [
+        "production",
+        "preview",
+        "development"
+      ],
+      "kind": "secret",
+      "owner": "human",
+      "why": "Signing secret (whsec_) of the test webhook endpoint for https://audiophile.royeradames.com/api/stripe/webhook. Without it the webhook answers 503 and paid orders settle only through the return page.",
+      "whyHuman": "Minted inside Royer's own Stripe account when the endpoint is created or rolled.",
+      "get": {
+        "url": "https://dashboard.stripe.com/test/webhooks",
+        "steps": [
+          "Open the endpoint for audiophile.royeradames.com/api/stripe/webhook and reveal its signing secret.",
+          "In your own Terminal: vercel env add STRIPE_WEBHOOK_SECRET production --sensitive (then preview)."
+        ]
+      }
+    },
+    {
+      "key": "STAFF_PASSWORD",
+      "target": [
+        "production",
+        "preview",
+        "development"
+      ],
+      "kind": "secret",
+      "owner": "human",
+      "why": "Password for the owner queue at /orders. Without it the queue says it is not configured outside localhost.",
+      "whyHuman": "Royer types it to open the queue, so he chooses it.",
+      "get": {
+        "url": "https://audiophile.royeradames.com/orders",
+        "steps": [
+          "Choose a password you keep in Bitwarden.",
+          "In your own Terminal: vercel env add STAFF_PASSWORD production --sensitive (then preview)."
+        ]
+      }
+    },
+    {
+      "key": "CRON_SECRET",
+      "target": [
+        "production"
+      ],
+      "kind": "secret",
+      "owner": "agent",
+      "why": "Vercel Cron sends it as a bearer token to /api/cron/purge-orders, the daily job that deletes orders never paid within 7 days. Without it the purge refuses to run and unpaid orders pile up.",
+      "agentFix": "Generate 32 random bytes in a script and POST them to the Vercel env API as type sensitive for production, without printing; then redeploy."
+    },
+    {
+      "key": "RATE_LIMIT_SECRET",
+      "target": [
+        "production",
+        "preview"
+      ],
+      "kind": "secret",
+      "owner": "agent",
+      "why": "Keys the HMAC that stores client addresses and browser sessions for rate limiting, so a copy of the table cannot reveal them. Without it each instance uses its own random key and limits are counted per instance.",
+      "agentFix": "Generate 32 random bytes in a script and POST them to the Vercel env API as type sensitive for production and preview, without printing; then redeploy."
+    },
+    {
+      "key": "AUTH_BASE_URL",
+      "target": [],
+      "kind": "config",
+      "owner": "agent",
+      "why": "Audiophile's exact Preview origin registered with the Breakthrough account issuer. Branch-scoped to feat/customer-orders on Preview only, so the doctor (which checks unscoped values) skips it. Without it, accounts show 'coming soon'.",
+      "agentFix": "royer-auth's connect-app.mjs writes the branch-scoped AUTH_* values for the registered branch."
+    },
+    {
+      "key": "AUTH_ISSUER_URL",
+      "target": [],
+      "kind": "config",
+      "owner": "agent",
+      "why": "The issuer origin plus /api/auth (accounts-preview.royeradames.com). Branch-scoped Preview only; production waits for the issuer's production deployment.",
+      "agentFix": "royer-auth's connect-app.mjs writes the branch-scoped AUTH_* values for the registered branch."
+    },
+    {
+      "key": "AUTH_CLIENT_ID",
+      "target": [],
+      "kind": "config",
+      "owner": "agent",
+      "why": "Audiophile's client ID at the issuer. Branch-scoped Preview only.",
+      "agentFix": "royer-auth's connect-app.mjs registers the client and writes it without printing."
+    },
+    {
+      "key": "AUTH_CLIENT_SECRET",
+      "target": [],
+      "kind": "secret",
+      "owner": "agent",
+      "why": "Audiophile's client secret at the issuer, used to exchange sign-in codes. Branch-scoped Preview only.",
+      "agentFix": "royer-auth's connect-app.mjs registers the client and writes it as Sensitive without printing."
+    },
+    {
+      "key": "AUTH_SECRET",
+      "target": [],
+      "kind": "secret",
+      "owner": "agent",
+      "why": "Audiophile's own session-signing secret (32+ characters). Branch-scoped Preview only.",
+      "agentFix": "royer-auth's connect-app.mjs generates it and writes it as Sensitive without printing."
+    }
+  ],
+  "probes": [
+    {
+      "name": "production store answers as a demo",
+      "target": "production",
+      "url": "https://audiophile.royeradames.com/api/store/features",
+      "expect": [
+        200
+      ],
+      "ifFails": "Check the latest production deployment and its runtime logs."
+    }
+  ],
+  "coverage": {
+    "roots": [
+      "app"
+    ],
+    "ignore": [
+      {
+        "key": "DATABASE_URL",
+        "reason": "Provisioned by the Vercel Neon integration (store audiophile-orders-db for Preview/Development, audiophile-orders-prod-db for Production)."
+      },
+      {
+        "key": "DATABASE_POOL_MAX",
+        "reason": "Test-only: the in-memory test database serves one session."
+      },
+      {
+        "key": "VERCEL",
+        "reason": "Set by Vercel at runtime."
+      }
+    ],
+    "patterns": [
+      "read\\(\"([A-Z][A-Z0-9_]*)\"\\)",
+      "\\benv\\.([A-Z][A-Z0-9_]*)",
+      "\"(AUTH_[A-Z_]+)\""
+    ]
+  }
+}

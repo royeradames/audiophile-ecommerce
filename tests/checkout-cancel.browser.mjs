@@ -47,7 +47,7 @@ try {
     await page.screenshot({ path: `outputs/checkout-cancel-${width}.png`, fullPage: true });
   }
   await page.getByRole('link', { name: 'Retry Stripe test payment', exact: true }).click();
-  await page.getByRole('heading', { name: `Pay ${original[0].id}`, exact: true }).waitFor();
+  await page.getByRole('heading', { name: `Order ${original[0].id}`, exact: true }).waitFor();
   await page.getByRole('button', { name: 'Open Stripe test Checkout', exact: true }).click();
   await page.getByRole('heading', { name: 'Card checkout canceled', exact: true }).waitFor();
   assert.deepEqual(requests, [original[0].id, original[0].id]);

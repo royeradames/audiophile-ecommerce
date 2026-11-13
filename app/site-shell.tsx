@@ -87,6 +87,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
+      <p className="demo-banner">
+        <strong>Demo store:</strong> nothing is sold, charged or shipped. Card payments use Stripe test mode.
+      </p>
       <main>{children}</main>
 
       <footer className="site-footer">
@@ -104,11 +107,11 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             <Link href="/zelle">Zelle</Link>
           </nav>
           <p>
-            Audiophile is an all-in-one destination for considered home and
-            personal audio. This portfolio challenge build uses fictional products.
-            Checkout can use Stripe test cards, DR bank transfer, Zelle, or pay
-            in person. Confirmation is not a live paid order until Stripe test
-            reports payment or a transfer is marked paid.
+            Audiophile is a demo store for considered home and personal audio,
+            built as a portfolio challenge with fictional products. Nothing is
+            sold, charged or shipped. Checkout runs end to end with Stripe test
+            cards, and the store saves orders without your name, email, phone or
+            address.
           </p>
           <p className="copyright">© 2026 Audiophile. Demo experience.</p>
         </div>

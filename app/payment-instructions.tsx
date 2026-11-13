@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { testCardHint } from "./demo-store";
 import type { PaymentMethod } from "./payment-methods";
 import type { PayeeSettings } from "./payee-settings";
 import { ZelleQr, zellePageHref } from "./zelle-qr";
@@ -25,20 +26,25 @@ export function PaymentInstructions({
 
   if (method === "hosted") {
     return (
-      <p className="payment-note">
-        Hosted card opens Stripe Checkout in test mode. Apple Pay and Google Pay
-        appear when Stripe and the device support them. Do not type a card number
-        into this form. Live AZUL is later, after affiliation.
-      </p>
+      <div className="payment-note">
+        <p>
+          Hosted card opens Stripe Checkout in test mode. Apple Pay and Google Pay
+          appear when Stripe and the device support them. Do not type a card number
+          into this form.
+        </p>
+        <p>{testCardHint}</p>
+      </div>
     );
   }
 
   if (method === "element") {
     return (
-      <p className="payment-note">
-        Own card form uses Stripe Payment Element. Card numbers stay on Stripe.
-        This is test mode only, not a live Dominican card rail.
-      </p>
+      <div className="payment-note">
+        <p>
+          Own card form uses Stripe Payment Element in test mode. Card numbers stay on Stripe.
+        </p>
+        <p>{testCardHint}</p>
+      </div>
     );
   }
 
@@ -46,8 +52,8 @@ export function PaymentInstructions({
     return (
       <div className="payment-note">
         <p>
-          Dev test payee details. Update them on the payment stack. Do not send
-          real money until these numbers match a live account.
+          Demo store: do not send money. These are test payee details from the
+          payment stack, and nothing will be shipped.
         </p>
         <InstructionList
           rows={[
@@ -68,6 +74,7 @@ export function PaymentInstructions({
   if (method === "zelle") {
     return (
       <div className="payment-note">
+        <p>Demo store: do not send money. Nothing will be shipped.</p>
         {showQr ? (
           <div className="zelle-scan">
             <ZelleQr

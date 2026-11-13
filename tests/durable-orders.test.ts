@@ -47,7 +47,7 @@ function json(url: string, body: unknown) {
 
 async function placeOrder(overrides: Record<string, unknown> = {}) {
   const response = await ordersRoute.POST(json("http://localhost/api/orders", {
-    requestKey: crypto.randomUUID(), payment: "element", pickupCity: "", customer, items: cart, ...overrides,
+    requestKey: crypto.randomUUID(), payment: "element", pickupCity: "", items: cart, ...overrides,
   }));
   return { status: response.status, body: await response.json() };
 }
@@ -66,7 +66,7 @@ function intentEvent(eventId: string, orderId: string, overrides: Record<string,
 test("the store reports durable orders when a database is configured", async (t) => {
   await withDatabase(t);
   const response = await featuresRoute.GET();
-  assert.deepEqual(await response.json(), { durableOrders: true, accounts: "coming_soon" });
+  assert.deepEqual(await response.json(), { demo: true, durableOrders: true, accounts: "coming_soon" });
 });
 
 test("an order is created from server prices, ignoring any browser total", async (t) => {
@@ -115,7 +115,8 @@ test("a cancelled card form and a retry reuse one order and one open PaymentInte
       assert.equal((init.body as URLSearchParams).get("amount"), String(XX99_TOTAL_CENTS));
     }
     return Response.json({
-      id: "pi_synthetic_retry", object: "payment_intent", status: "requires_payment_method", livemode: false,
+      // The account's API version still says requires_source for requires_payment_method.
+      id: "pi_synthetic_retry", object: "payment_intent", status: "requires_source", livemode: false,
       amount: XX99_TOTAL_CENTS, currency: "usd", client_secret: "pi_synthetic_retry_secret_x", metadata: { order_id: orderId },
     });
   });
@@ -143,7 +144,7 @@ test("hosted Checkout charges the stored total and refuses a mismatched cart", a
   let charged = "";
   t.mock.method(globalThis, "fetch", async (_url: string, init: RequestInit) => {
     charged = (init.body as URLSearchParams).get("line_items[0][price_data][unit_amount]") ?? "";
-    return Response.json({ url: "https://checkout.stripe.com/synthetic" });
+    return Response.json({ id: "cs_test_synthetic", url: "https://checkout.stripe.com/synthetic", livemode: false });
   });
   const ok = await checkoutRoute.POST(json("http://localhost/api/stripe/checkout", { orderId: body.order.id, email: customer.email, items: cart }));
   assert.equal(ok.status, 200);
@@ -157,6 +158,102 @@ test("hosted Checkout charges the stored total and refuses a mismatched cart", a
     orderId: "AUD-0000000000", email: customer.email, items: cart,
   }));
   assert.equal(missing.status, 404);
+});
+
+test("a retry after an unrecorded successful card payment settles the order instead of charging again", async (t) => {
+  const database = await withDatabase(t);
+  const { body } = await placeOrder();
+  const orderId = body.order.id;
+  let stripeStatus = "requires_payment_method";
+  const created: string[] = [];
+  t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
+    if (init.method === "POST") created.push(url);
+    return Response.json({
+      id: "pi_synthetic_paid", object: "payment_intent", status: stripeStatus, livemode: false,
+      amount: XX99_TOTAL_CENTS, amount_received: stripeStatus === "succeeded" ? XX99_TOTAL_CENTS : 0, currency: "usd",
+      client_secret: "pi_synthetic_paid_secret_x", metadata: { order_id: orderId },
+    });
+  });
+  const start = () => intentRoute.POST(json("http://localhost/api/stripe/payment-intent", { orderId, email: customer.email, items: cart }));
+  assert.equal((await start()).status, 200);
+
+  // Stripe took the payment, but neither the return call nor the webhook reached the store.
+  stripeStatus = "processing";
+  const processing = await start();
+  assert.equal(processing.status, 409, "A processing payment blocks a second charge");
+  stripeStatus = "succeeded";
+  const retry = await start();
+  assert.equal(retry.status, 409);
+  assert.match((await retry.json()).error, /already paid/);
+  assert.equal(created.length, 1, "Only the first request created a PaymentIntent");
+  const { rows } = await database.query(`select "status" from "audiophile_orders" where "id" = $1`, [orderId]);
+  assert.equal(rows[0].status, "paid", "The retry recorded the payment Stripe already took");
+});
+
+test("a new hosted Checkout page closes the earlier one, and a paid page settles the order", async (t) => {
+  const database = await withDatabase(t);
+  const { body } = await placeOrder({ payment: "hosted" });
+  const orderId = body.order.id;
+  const sessions = new Map<string, { status: string; payment_status: string }>();
+  const calls: string[] = [];
+  const byKey = new Map<string, string>();
+  t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
+    const path = new URL(url).pathname;
+    calls.push(`${init.method} ${path}`);
+    if (path === "/v1/checkout/sessions") {
+      // Like Stripe, a repeated idempotency key returns the first session.
+      const key = (init.headers as Record<string, string>)["idempotency-key"];
+      const id = byKey.get(key) ?? `cs_test_synthetic_${sessions.size + 1}`;
+      if (!byKey.has(key)) {
+        byKey.set(key, id);
+        sessions.set(id, { status: "open", payment_status: "unpaid" });
+      }
+      return Response.json({ id, url: `https://checkout.stripe.com/${id}`, livemode: false });
+    }
+    const id = path.split("/")[4];
+    const session = sessions.get(id)!;
+    if (path.endsWith("/expire")) session.status = "expired";
+    return Response.json({
+      id, object: "checkout.session", livemode: false, client_reference_id: orderId, currency: "usd",
+      amount_total: XX99_TOTAL_CENTS, payment_intent: session.payment_status === "paid" ? "pi_synthetic_hosted" : null, ...session,
+    });
+  });
+  const start = () => checkoutRoute.POST(json("http://localhost/api/stripe/checkout", { orderId, email: customer.email, items: cart }));
+
+  // Two tabs (or a double click) at once get one page.
+  const [first, twin] = await Promise.all([start(), start()]);
+  assert.equal(first.status, 200);
+  assert.equal((await first.json()).url, (await twin.json()).url);
+  assert.equal(sessions.size, 1);
+  assert.equal((await start()).status, 200, "Retrying after a cancel opens a new page");
+  assert.equal(sessions.get("cs_test_synthetic_1")?.status, "expired", "The earlier page can no longer take payment");
+
+  // The shopper pays on the second page; the return call never arrives.
+  Object.assign(sessions.get("cs_test_synthetic_2")!, { status: "complete", payment_status: "paid" });
+  const third = await start();
+  assert.equal(third.status, 409);
+  const { rows } = await database.query(`select "status" from "audiophile_orders" where "id" = $1`, [orderId]);
+  assert.equal(rows[0].status, "paid");
+  assert.equal(sessions.size, 2);
+
+  const wrongMethod = await intentRoute.POST(json("http://localhost/api/stripe/payment-intent", { orderId, email: customer.email, items: cart }));
+  assert.equal(wrongMethod.status, 409, "A hosted-card order cannot also open the card form");
+});
+
+test("a broken account setting keeps checkout working and shows accounts as coming soon", async (t) => {
+  await withDatabase(t);
+  const previous = { ...process.env };
+  t.after(() => {
+    for (const name of ["AUTH_BASE_URL", "AUTH_SECRET", "AUTH_ISSUER_URL", "AUTH_CLIENT_ID", "AUTH_CLIENT_SECRET"]) {
+      if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name];
+    }
+  });
+  Object.assign(process.env, {
+    AUTH_BASE_URL: "https://shop.example", AUTH_SECRET: "too-short", AUTH_ISSUER_URL: "https://issuer.example/api/auth/",
+    AUTH_CLIENT_ID: "synthetic", AUTH_CLIENT_SECRET: "synthetic",
+  });
+  assert.deepEqual(await (await featuresRoute.GET()).json(), { demo: true, durableOrders: true, accounts: "coming_soon" });
+  assert.equal((await placeOrder()).status, 201);
 });
 
 test("a repeated webhook and the return page settle the order exactly once", async (t) => {
@@ -224,7 +321,7 @@ test("a customer's history holds only their own orders", async (t) => {
     ('user-a', 'A', 'a@example.test', true), ('user-b', 'B', 'b@example.test', true)`);
   const pool = (await import("../app/server/database.ts")).getDatabase();
   assert.ok(pool);
-  const input = { requestKey: crypto.randomUUID(), payment: "transfer" as const, pickupCity: "" as const, customer, items: cart };
+  const input = { requestKey: crypto.randomUUID(), payment: "transfer" as const, pickupCity: "" as const, items: cart };
   const mine = await store.createOrder(pool, input, "user-a");
   await store.createOrder(pool, { ...input, requestKey: crypto.randomUUID() }, "user-b");
   await store.createOrder(pool, { ...input, requestKey: crypto.randomUUID() }, null);

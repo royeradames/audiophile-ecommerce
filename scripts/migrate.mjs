@@ -1,7 +1,7 @@
 // Applies the reviewed migrations to one named Neon database.
 //
 //   vercel env run -e preview -- node scripts/migrate.mjs \
-//     --neon-project=<NEON_PROJECT_ID> --reviewed-sha256=<combined hash>
+//     --neon-project=<NEON_PROJECT_ID> --reviewed-sha256=<combined hash> [--through=<file>]
 //
 // Run `node scripts/migrate.mjs --plan` first to print the combined hash for
 // review. Output holds names and hashes only, never connection details.
@@ -9,7 +9,12 @@ import pg from "pg";
 import { applyMigrations, combinedHash, readMigrations } from "./migrations.mjs";
 
 const option = (name) => process.argv.find((value) => value.startsWith(`--${name}=`))?.split("=")[1];
-const migrations = await readMigrations();
+// --through=<file> stops after that file, for expand/contract releases:
+// apply the expand step, ship the code, then apply the rest.
+const through = option("through");
+const all = await readMigrations();
+if (through && !all.some((migration) => migration.name === through)) throw new Error(`No migration named ${through}.`);
+const migrations = through ? all.slice(0, all.findIndex((migration) => migration.name === through) + 1) : all;
 const hash = combinedHash(migrations);
 
 if (process.argv.includes("--plan")) {

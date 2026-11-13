@@ -13,7 +13,7 @@ export async function fetchStripeConfig(): Promise<StripePublicConfig> {
 function paymentBody(input: PaymentRequest) {
   return JSON.stringify({
     orderId: input.orderId,
-    email: input.email,
+    // The email stays in the browser: the demo store never sends it.
     items: input.items.map(({ productId, quantity }) => ({ productId, quantity })),
   });
 }
@@ -101,10 +101,19 @@ export async function fetchStripePaymentIntent(intentId: string) {
 export async function fetchPaidOrderIds() {
   const response = await fetch("/api/stripe/paid");
   if (!response.ok) {
-    return [] as string[];
+    return { paid: [] as string[], refundsNeeded: [] as Array<{ orderId: string; payments: number }> };
   }
-  const body = (await response.json()) as { orders?: Array<{ orderId?: string }> };
-  return (body.orders ?? [])
-    .map((entry) => entry.orderId)
-    .filter((orderId): orderId is string => typeof orderId === "string");
+  const body = (await response.json()) as {
+    orders?: Array<{ orderId?: string }>;
+    refundsNeeded?: Array<{ orderId?: string; payments?: number }>;
+  };
+  return {
+    paid: (body.orders ?? [])
+      .map((entry) => entry.orderId)
+      .filter((orderId): orderId is string => typeof orderId === "string"),
+    refundsNeeded: (body.refundsNeeded ?? []).flatMap((entry) =>
+      typeof entry.orderId === "string" && typeof entry.payments === "number"
+        ? [{ orderId: entry.orderId, payments: entry.payments }]
+        : []),
+  };
 }
