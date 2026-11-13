@@ -72,12 +72,23 @@ declare global {
   var __audiophileAccounts: FederatedAuth | undefined;
 }
 
+/**
+ * Customer accounts, or null when they are not configured here. A broken
+ * account setting turns accounts off ("coming soon") instead of breaking
+ * checkout, payments and webhooks, which never depend on them.
+ */
 export function getAccounts(database: pg.Pool | null): FederatedAuth | null {
   if (!database) return null;
-  const settings = accountSettings();
-  if (!settings) return null;
-  globalThis.__audiophileAccounts ??= configureAccounts(database, settings);
-  return globalThis.__audiophileAccounts;
+  if (globalThis.__audiophileAccounts) return globalThis.__audiophileAccounts;
+  try {
+    const settings = accountSettings();
+    if (!settings) return null;
+    globalThis.__audiophileAccounts = configureAccounts(database, settings);
+    return globalThis.__audiophileAccounts;
+  } catch {
+    console.error(JSON.stringify({ event: "account_settings_invalid" }));
+    return null;
+  }
 }
 
 export type CustomerCheck =

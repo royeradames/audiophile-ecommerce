@@ -67,6 +67,17 @@ create table if not exists "audiophile_payments" (
 create index if not exists "audiophile_payments_order_idx"
   on "audiophile_payments" ("order_id", "created_at" desc);
 
+-- Hosted Checkout sessions started for an order. Before a new one starts,
+-- the earlier ones are expired, so only one hosted page can take payment.
+create table if not exists "audiophile_checkout_sessions" (
+  "session_id" text primary key check ("session_id" ~ '^cs_[A-Za-z0-9_]+$'),
+  "order_id" text not null references "audiophile_orders" ("id") on delete cascade,
+  "created_at" timestamptz not null default now()
+);
+
+create index if not exists "audiophile_checkout_sessions_order_idx"
+  on "audiophile_checkout_sessions" ("order_id", "created_at" desc);
+
 -- Stripe retries webhooks. Each event id is handled once.
 create table if not exists "audiophile_stripe_events" (
   "event_id" text primary key check ("event_id" ~ '^evt_[A-Za-z0-9_]+$'),

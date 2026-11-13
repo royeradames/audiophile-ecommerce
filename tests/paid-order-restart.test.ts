@@ -27,10 +27,6 @@ test("a paid order is still listed after the server restarts", async (t) => {
         requestKey: "6d5c1f7e-0f4a-4d1b-9c55-1e0c7c1b2a01",
         payment: "element",
         pickupCity: "",
-        customer: {
-          name: "Synthetic Buyer", email: "restart@example.test", phone: "+1 202 555 0100",
-          address: "1 Test Lane", zip: "10001", city: "Testville", country: "Testland",
-        },
         items: [{ productId: "xx99-mark-two-headphones", quantity: 1 }],
       }),
     }));

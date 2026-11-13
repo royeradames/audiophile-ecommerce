@@ -1,3 +1,4 @@
+import { requestOrigin } from "../../../request-origin";
 import { serverRuntime } from "../../../server/runtime";
 
 export const dynamic = "force-dynamic";
@@ -16,11 +17,30 @@ function callbackFailure(response: Response | null, origin: string) {
   return new Response(null, { status: 303, headers });
 }
 
-async function handle(request: Request) {
+/**
+ * The account handler refuses any origin but this deployment's registered
+ * one. Behind a TLS-terminating proxy the server sees plain HTTP, so when the
+ * forwarded host and protocol name exactly the registered address, present
+ * the request as the browser sent it. Anything else is left unchanged.
+ */
+function asSeenByBrowser(request: Request) {
+  try {
+    const registered = process.env.AUTH_BASE_URL ? new URL(process.env.AUTH_BASE_URL).origin : null;
+    const forwarded = requestOrigin(request);
+    const seen = new URL(request.url);
+    if (!registered || seen.origin === registered || forwarded !== registered) return request;
+    return new Request(new URL(seen.pathname + seen.search, registered), request);
+  } catch {
+    return request;
+  }
+}
+
+async function handle(incoming: Request) {
   const accounts = serverRuntime()?.accounts;
   if (!accounts) {
     return Response.json({ error: "Customer accounts are coming soon." }, { status: 404, headers: noStore });
   }
+  const request = asSeenByBrowser(incoming);
   const url = new URL(request.url);
   const callback = request.method === "GET" && url.pathname === callbackPath;
   try {

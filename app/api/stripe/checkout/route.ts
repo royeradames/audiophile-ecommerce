@@ -2,7 +2,8 @@ import { createStripeCheckoutSession } from "../../../stripe-api";
 import { stripePublicConfig } from "../../../stripe-env";
 import { requestOrigin } from "../../../request-origin";
 import { readPaymentRequest } from "../../../payment-request";
-import { payableOrder } from "../../../server/payments";
+import { hostedCheckoutFor, payableOrder } from "../../../server/payments";
+import { clientAddress, limits, overLimit, tooManyRequests } from "../../../server/rate-limit";
 import { serverRuntime } from "../../../server/runtime";
 
 export async function POST(request: Request) {
@@ -17,18 +18,34 @@ export async function POST(request: Request) {
     );
   }
 
+  const runtimeForLimit = serverRuntime();
+  if (runtimeForLimit) {
+    try {
+      const wait = await overLimit(runtimeForLimit.db, [
+        { scope: "payments:address", id: clientAddress(request), limit: limits.paymentStartsPerAddress },
+      ]);
+      if (wait !== null) return tooManyRequests(wait, "Too many payment attempts from this connection.");
+    } catch {
+      return Response.json({ error: "Payment could not start. Nothing was charged; please try again." }, { status: 503 });
+    }
+  }
+
   const payment = await readPaymentRequest(request);
   if (!payment.ok) {
     return Response.json({ error: payment.error }, { status: payment.status });
   }
 
-  let { orderId, amountCents, email } = payment;
   const runtime = serverRuntime();
   if (runtime) {
     try {
-      const payable = await payableOrder(runtime.db, payment);
+      const payable = await payableOrder(runtime.db, payment, "hosted");
       if (!payable.ok) return Response.json({ error: payable.error }, { status: payable.status });
-      ({ id: orderId, totalCents: amountCents, email } = payable.order);
+      const hosted = await hostedCheckoutFor(runtime.db, payable.order, {
+        origin: requestOrigin(request),
+        description: payment.description,
+      });
+      if (!hosted.ok) return Response.json({ error: hosted.error }, { status: hosted.status });
+      return Response.json({ url: hosted.url });
     } catch {
       return Response.json({ error: "Could not start Stripe test Checkout. Please try again." }, { status: 502 });
     }
@@ -36,9 +53,9 @@ export async function POST(request: Request) {
 
   try {
     const session = await createStripeCheckoutSession({
-      orderId,
-      amountCents,
-      email,
+      orderId: payment.orderId,
+      amountCents: payment.amountCents,
+      email: payment.email,
       origin: requestOrigin(request),
       description: payment.description,
     });

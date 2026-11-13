@@ -6,6 +6,8 @@ Product source of truth: the Obsidian note `audiophile-payment.md`. This file is
 
 ## Locks
 
+- **Demo store.** Nothing is sold, charged for real or shipped. Stripe stays in test mode and the app refuses live keys. Use **Fill sample details** or other fictional details, and Stripe's test card 4242 4242 4242 4242.
+
 - Confirmation is **not** paid.
 - Do **not** type a real card number into this shop. Stripe fields only, test cards only.
 - Do **not** send RD$ to the mock Banreservas / Popular numbers (`960-000000000-1`, `730-000000000-1`).
@@ -187,12 +189,7 @@ Needs test keys. New cart.
 - [ ] Confirmation is not paid. Open **Pay with Zelle**. Name is Royer Adames. Memo copy is the `AUD-` id
 - [ ] `/orders` → **Pending transfer** → **Mark paid**
 
-Optional live $1 (only when ready, still human-verify):
-
-- [ ] Second US bank app → Send → scan the official QR
-- [ ] Confirm name **Royer Adames**
-- [ ] Amount $1. Memo = that order ID
-- [ ] Then **Mark paid**. Never treat the scan itself as paid
+No live payment: since October 8, 2026 this is a demo store. Do not send money by Zelle or bank transfer; mark the test order paid by hand instead.
 
 ## 8. Pay in person
 

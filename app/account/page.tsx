@@ -25,9 +25,13 @@ export default function AccountPage() {
   const [message, setMessage] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
-  const load = useCallback(async () => {
-    const features = await fetchStoreFeatures();
-    if (features.accounts !== "enabled") return { state: "coming_soon" } as const;
+  const load = useCallback(async (): Promise<View> => {
+    try {
+      const features = await fetchStoreFeatures();
+      if (features.accounts !== "enabled") return { state: "coming_soon" };
+    } catch {
+      return { state: "error", error: "The store could not be reached. Try again in a moment." };
+    }
     return fetchAccountOrders();
   }, []);
 
@@ -107,7 +111,8 @@ export default function AccountPage() {
             <p>
               Audiophile uses your Breakthrough account, the shared sign-in for Breakthrough
               Development apps. Orders you place while signed in are saved here and follow you to
-              any browser.
+              any browser. Signing in keeps your account name and email with Audiophile so it can
+              show your history; checkout details still stay in your browser.
             </p>
             <div className="order-card-actions">
               <button className="button button-primary" type="button" aria-busy={busy === "sign-in"} onClick={signIn}>

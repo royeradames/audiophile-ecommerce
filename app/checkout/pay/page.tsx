@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { CardPayment } from "../../card-payment";
 import { formatUsd } from "../../checkout-totals";
 import type { OrderSummary } from "../../order-api";
@@ -34,7 +34,7 @@ function CheckoutPayClient() {
   const [server, setServer] = useState<ServerOrder>({ state: "loading" });
   const [error, setError] = useState<string | null>(null);
   const [paid, setPaid] = useState(false);
-  const [email, setEmail] = useState("");
+  const [confirming, setConfirming] = useState(false);
   const [opening, setOpening] = useState(false);
   const local = orders.find((item) => item.id === orderId);
 
@@ -42,7 +42,13 @@ function CheckoutPayClient() {
     if (!orderId) return;
     let cancelled = false;
     void (async () => {
-      const features = await fetchStoreFeatures();
+      let features;
+      try {
+        features = await fetchStoreFeatures();
+      } catch {
+        if (!cancelled) setServer({ state: "error", error: "The store could not be reached. Try again in a moment." });
+        return;
+      }
       if (!features.durableOrders) {
         if (!cancelled) setServer({ state: "browser_only" });
         return;
@@ -55,13 +61,19 @@ function CheckoutPayClient() {
     return () => {
       cancelled = true;
     };
-  }, [orderId, paid]);
+  }, [orderId, paid, confirming]);
 
   // The server is authoritative; bring this browser's copy up to date.
   const serverStatus = server.state === "found" ? server.order.status : null;
   useEffect(() => {
     if (serverStatus === "paid" && local && local.status !== "paid") markPaid(local.id);
   }, [serverStatus, local, markPaid]);
+
+  const lines = server.state === "found" ? server.order.lines : local?.lines;
+  const items = useMemo(
+    () => (lines ?? []).map((line) => ({ productId: line.productId, quantity: line.quantity })),
+    [lines],
+  );
 
   if (!orderId) return <PayBody message="Open an order from its confirmation link or your account." />;
   if (server.state === "loading") return <PayBody message="Loading the order…" />;
@@ -76,15 +88,15 @@ function CheckoutPayClient() {
     return (
       <PayBody
         message={server.state === "missing"
-          ? "No order has that ID. Check the link from your confirmation, or place the order again from checkout."
+          ? "No order has that ID. Orders never paid are deleted after 7 days; otherwise check the link from your confirmation, or place the order again from checkout."
           : "That order is not in this browser. Place it again from checkout, or open pending orders on the same device."}
       />
     );
   }
 
-  const items = order.lines.map((line) => ({ productId: line.productId, quantity: line.quantity }));
-  const payerEmail = local?.customer.email ?? email.trim();
-  const canPay = order.status === "pending_hosted" && !paid;
+  // Only prefills Stripe's fields when this browser placed the order.
+  const payer = local?.customer.email;
+  const canPay = order.status === "pending_hosted" && !paid && !confirming;
 
   return (
     <section className="stack-page section" aria-labelledby="pay-title">
@@ -94,7 +106,11 @@ function CheckoutPayClient() {
           <div>
             <h1 id="pay-title">Order {order.id}</h1>
             <p>
-              {paid ? "Stripe test payment recorded. This is not a live merchant charge." : `${orderStatusLabels[order.status]} · ${formatUsd(order.grandTotal)} USD.`}
+              {paid
+                ? "Stripe test payment recorded. This is not a live merchant charge."
+                : confirming
+                  ? "Stripe accepted the test payment. The store is still confirming it; reload this page in a moment."
+                  : `${orderStatusLabels[order.status]} · ${formatUsd(order.grandTotal)} USD.`}
               {canPay ? " Test mode only. Card numbers stay on Stripe." : null}
             </p>
             {error ? <p className="stack-hint" role="alert">{error}</p> : null}
@@ -106,30 +122,17 @@ function CheckoutPayClient() {
 
         <OrderSummaryCard order={paid ? { ...order, status: "paid" } : order} headingLevel={2} />
 
-        {canPay && !local ? (
-          <label className="form-field pay-email" htmlFor="pay-email">
-            <span>Email used at checkout</span>
-            <input
-              id="pay-email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </label>
-        ) : null}
-
-        {canPay && payerEmail ? (
+        {canPay ? (
           <div className="pay-actions">
             {order.payment === "element" ? (
               <CardPayment
-                key={payerEmail}
                 orderId={order.id}
                 items={items}
-                email={payerEmail}
-                onPaid={() => {
-                  if (local) markPaid(order.id);
-                  setPaid(true);
+                email={payer}
+                onPaid={(recorded) => {
+                  if (recorded && local) markPaid(order.id);
+                  if (recorded) setPaid(true);
+                  else setConfirming(true);
                 }}
               />
             ) : (
@@ -141,7 +144,7 @@ function CheckoutPayClient() {
                   if (opening) return;
                   setOpening(true);
                   setError(null);
-                  const result = await startHostedCheckout({ orderId: order.id, items, email: payerEmail });
+                  const result = await startHostedCheckout({ orderId: order.id, items, email: payer });
                   if (result.ok) {
                     window.location.assign(result.url);
                     return;

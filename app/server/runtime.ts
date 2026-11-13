@@ -1,5 +1,6 @@
 import type { FederatedAuth } from "@royer/auth/federation";
 import type pg from "pg";
+import { DEMO_STORE } from "../demo-store";
 import type { StoreFeatures } from "../order-api";
 import { getAccounts, currentCustomer, type CustomerCheck } from "./accounts";
 import { getDatabase } from "./database";
@@ -20,6 +21,7 @@ export function serverRuntime(): { db: pg.Pool; accounts: FederatedAuth | null }
 export function storeFeatures(): StoreFeatures {
   const runtime = serverRuntime();
   return {
+    demo: DEMO_STORE,
     durableOrders: runtime !== null,
     accounts: runtime?.accounts ? "enabled" : "coming_soon",
   };
