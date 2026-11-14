@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Audiophile</title>
+  <rect width="64" height="64" rx="15" fill="#101010"/>
+  <path d="M18 34c0-11 6.2-18 14-18s14 7 14 18" fill="none" stroke="#c96e3b" stroke-width="5.5" stroke-linecap="round"/>
+  <rect x="12" y="30" width="12" height="18" rx="6" fill="#c96e3b"/>
+  <rect x="40" y="30" width="12" height="18" rx="6" fill="#c96e3b"/>
+  <rect x="15.5" y="33.5" width="5" height="11" rx="2.5" fill="#f3f0ed"/>
+  <rect x="43.5" y="33.5" width="5" height="11" rx="2.5" fill="#f3f0ed"/>
+</svg>
